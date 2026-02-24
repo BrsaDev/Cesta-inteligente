@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { User, Shield, Award, Settings, LogOut, ChevronRight, History } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { User, Shield, Award, Settings, LogOut, ChevronRight, History, Store } from 'lucide-react';
 import { Card } from '@/src/components/ui/Card';
 import { Button } from '@/src/components/ui/Button';
 
 export const Profile = () => {
+  const navigate = useNavigate();
   const [user] = useState({
     name: 'Bruno',
     email: 'bruno@exemplo.com',
@@ -15,6 +17,7 @@ export const Profile = () => {
   const menuItems = [
     { icon: History, label: 'Histórico de contribuições', count: user.contributions },
     { icon: Award, label: 'Conquistas e Medalhas', count: 4 },
+    { icon: Store, label: 'Painel do Mercado', count: null, path: '/market' },
     { icon: Shield, label: 'Segurança e Privacidade', count: null },
     { icon: Settings, label: 'Configurações', count: null },
   ];
@@ -58,6 +61,7 @@ export const Profile = () => {
         {menuItems.map((item, idx) => (
           <button
             key={idx}
+            onClick={() => item.path && navigate(item.path)}
             className="w-full flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors active:scale-[0.98]"
           >
             <div className="flex items-center space-x-4">

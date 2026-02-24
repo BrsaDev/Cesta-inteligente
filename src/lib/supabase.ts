@@ -43,6 +43,7 @@ export interface Price {
   source_type: 'user' | 'market';
   has_proof: boolean;
   proof_url?: string;
+  flash_sale_ends_at?: string; // ISO string
   created_by: string;
   created_at: string;
   expires_at: string;
