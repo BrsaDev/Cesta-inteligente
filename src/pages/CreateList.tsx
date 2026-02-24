@@ -22,8 +22,10 @@ export const CreateList = () => {
 
   const fuse = new Fuse(suggestions.map(s => ({ name: s })), {
     keys: ['name'],
-    threshold: 0.3,
+    threshold: 0.2,
     distance: 100,
+    minMatchCharLength: 3,
+    includeScore: true,
     ignoreLocation: true,
     getFn: (obj, path) => {
       const value = (obj as any)[path as string];
@@ -32,7 +34,16 @@ export const CreateList = () => {
   });
 
   const filteredSuggestions = search 
-    ? fuse.search(normalizeString(search)).map(r => r.item.name)
+    ? fuse.search(normalizeString(search))
+        .filter(r => {
+          if (r.score && r.score > 0.1) {
+            const name = normalizeString(r.item.name);
+            const query = normalizeString(search);
+            return name.split(/\s+/).some(word => word.startsWith(query));
+          }
+          return true;
+        })
+        .map(r => r.item.name)
     : [];
 
   const addItem = (name: string) => {

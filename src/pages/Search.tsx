@@ -18,28 +18,33 @@ export const SearchPage = () => {
   const [selectedProof, setSelectedProof] = useState<string | null>(null);
   
   const allProducts = [
-    { id: '1', name: 'Leite Integral 1L', brand: 'Parmalat', price: 4.50, market: 'Mercado A', proof: true, proofUrl: 'https://picsum.photos/seed/leite/600/800', time: '1h atrás', distance: '0.8km', icon: '🥛', flashSale: { endsIn: '02:45:12' } },
-    { id: '2', name: 'Leite Integral 1L', brand: 'Itambé', price: 4.79, market: 'Mercado B', proof: false, time: '3h atrás', distance: '1.2km', icon: '🥛' },
-    { id: '3', name: 'Leite Integral 1L', brand: 'Piracanjuba', price: 5.10, market: 'Mercado C', proof: false, time: '12h atrás', distance: '2.5km', icon: '🥛' },
-    { id: '4', name: 'Feijão Carioca 1kg', brand: 'Kicaldo', price: 8.90, market: 'Mercado A', proof: true, proofUrl: 'https://picsum.photos/seed/feijao1/600/800', time: '2h atrás', distance: '0.8km', icon: '🥘', flashSale: { endsIn: '00:15:45' } },
-    { id: '5', name: 'Feijão Preto 1kg', brand: 'Camil', price: 7.50, market: 'Mercado B', proof: true, proofUrl: 'https://picsum.photos/seed/feijao2/600/800', time: '30min atrás', distance: '1.2km', icon: '🥘' },
-    { id: '6', name: 'Arroz Branco 5kg', brand: 'Tio João', price: 22.90, market: 'Mercado X', proof: true, proofUrl: 'https://picsum.photos/seed/arroz/600/800', time: '5h atrás', distance: '3.0km', icon: '🍚' },
-    { id: '7', name: 'Café Torrado 500g', brand: 'Pilão', price: 15.50, market: 'Mercado Z', proof: false, time: '1h atrás', distance: '1.5km', icon: '☕' },
-    { id: '8', name: 'Alcatra Bovina kg', brand: 'Friboi', price: 38.90, market: 'Mercado A', proof: true, proofUrl: 'https://picsum.photos/seed/carne1/600/800', time: '45min atrás', distance: '0.8km', icon: '🥩' },
-    { id: '9', name: 'Peito de Frango 1kg', brand: 'Seara', price: 18.50, market: 'Mercado B', proof: false, time: '2h atrás', distance: '1.2km', icon: '🍗' },
-    { id: '10', name: 'Contra Filé kg', brand: 'Swift', price: 42.00, market: 'Mercado C', proof: true, proofUrl: 'https://picsum.photos/seed/carne2/600/800', time: '1h atrás', distance: '2.5km', icon: '🥩' },
+    { id: '1', name: 'Leite Integral 1L', brand: 'Parmalat', price: 4.50, market: 'Mercado A', proof: true, proofUrl: 'https://picsum.photos/seed/leite/600/800', time: '1h atrás', distance: '0.8km', icon: '🥛', flashSale: { endsIn: '02:45:12' }, tags: ['leite', 'laticinio', 'bebida'] },
+    { id: '2', name: 'Leite Integral 1L', brand: 'Itambé', price: 4.79, market: 'Mercado B', proof: false, time: '3h atrás', distance: '1.2km', icon: '🥛', tags: ['leite', 'laticinio', 'bebida'] },
+    { id: '3', name: 'Leite Integral 1L', brand: 'Piracanjuba', price: 5.10, market: 'Mercado C', proof: false, time: '12h atrás', distance: '2.5km', icon: '🥛', tags: ['leite', 'laticinio', 'bebida'] },
+    { id: '4', name: 'Feijão Carioca 1kg', brand: 'Kicaldo', price: 8.90, market: 'Mercado A', proof: true, proofUrl: 'https://picsum.photos/seed/feijao1/600/800', time: '2h atrás', distance: '0.8km', icon: '🥘', flashSale: { endsIn: '00:15:45' }, tags: ['feijao', 'grao', 'alimento'] },
+    { id: '5', name: 'Feijão Preto 1kg', brand: 'Camil', price: 7.50, market: 'Mercado B', proof: true, proofUrl: 'https://picsum.photos/seed/feijao2/600/800', time: '30min atrás', distance: '1.2km', icon: '🥘', tags: ['feijao', 'grao', 'alimento'] },
+    { id: '6', name: 'Arroz Branco 5kg', brand: 'Tio João', price: 22.90, market: 'Mercado X', proof: true, proofUrl: 'https://picsum.photos/seed/arroz/600/800', time: '5h atrás', distance: '3.0km', icon: '🍚', tags: ['arroz', 'grao', 'alimento'] },
+    { id: '7', name: 'Café Torrado 500g', brand: 'Pilão', price: 15.50, market: 'Mercado Z', proof: false, time: '1h atrás', distance: '1.5km', icon: '☕', tags: ['cafe', 'bebida', 'matinal'] },
+    { id: '8', name: 'Alcatra Bovina kg', brand: 'Friboi', price: 38.90, market: 'Mercado A', proof: true, proofUrl: 'https://picsum.photos/seed/carne1/600/800', time: '45min atrás', distance: '0.8km', icon: '🥩', tags: ['carne', 'bovino', 'churrasco', 'proteina'] },
+    { id: '9', name: 'Peito de Frango 1kg', brand: 'Seara', price: 18.50, market: 'Mercado B', proof: false, time: '2h atrás', distance: '1.2km', icon: '🍗', tags: ['carne', 'frango', 'ave', 'proteina'] },
+    { id: '10', name: 'Contra Filé kg', brand: 'Swift', price: 42.00, market: 'Mercado C', proof: true, proofUrl: 'https://picsum.photos/seed/carne2/600/800', time: '1h atrás', distance: '2.5km', icon: '🥩', tags: ['carne', 'bovino', 'churrasco', 'proteina'] },
+    { id: '11', name: 'Biscoito Trakinas 126g', brand: 'Mondelēz', price: 3.20, market: 'Mercado B', proof: true, proofUrl: 'https://picsum.photos/seed/trakinas/600/800', time: '10min atrás', distance: '1.2km', icon: '🍪', tags: ['biscoito', 'bolacha', 'doce', 'recheado', 'lanche'] },
+    { id: '12', name: 'Bolacha Passatempo 130g', brand: 'Nestlé', price: 3.50, market: 'Mercado A', proof: false, time: '4h atrás', distance: '0.8km', icon: '🍪', tags: ['biscoito', 'bolacha', 'doce', 'recheado', 'lanche'] },
+    { id: '13', name: 'Macarrão Espaguete 500g', brand: 'Adria', price: 5.90, market: 'Mercado C', proof: true, proofUrl: 'https://picsum.photos/seed/massa/600/800', time: '1h atrás', distance: '2.5km', icon: '🍝', tags: ['massa', 'macarrao', 'pasta', 'alimento'] },
   ];
 
   const fuse = new Fuse(allProducts, {
     keys: [
-      { name: 'name', weight: 0.7 },
-      { name: 'brand', weight: 0.3 }
+      { name: 'name', weight: 0.6 },
+      { name: 'tags', weight: 0.3 },
+      { name: 'brand', weight: 0.1 }
     ],
-    threshold: 0.3,
+    threshold: 0.2,
     distance: 100,
-    minMatchCharLength: 2,
+    minMatchCharLength: 3,
     includeScore: true,
-    ignoreLocation: true,
+    ignoreLocation: false, // Changed to false to respect word boundaries better
+    location: 0,
     getFn: (obj, path) => {
       const value = (obj as any)[path as string];
       return typeof value === 'string' ? normalizeString(value) : value;
@@ -47,7 +52,21 @@ export const SearchPage = () => {
   });
 
   const results = search 
-    ? fuse.search(normalizeString(search)).map(r => r.item)
+    ? fuse.search(normalizeString(search))
+        .filter(r => {
+          // Additional filter: if the match is in the name, it should ideally 
+          // start at a word boundary or be a very high quality match.
+          // This prevents "pasta" matching "Passatempo" just because it's a substring.
+          if (r.score && r.score > 0.1) {
+            const name = normalizeString(r.item.name);
+            const query = normalizeString(search);
+            const isAtWordBoundary = name.split(/\s+/).some(word => word.startsWith(query));
+            const isTagMatch = r.item.tags?.some(tag => normalizeString(tag) === query);
+            return isAtWordBoundary || isTagMatch;
+          }
+          return true;
+        })
+        .map(r => r.item)
     : [];
 
   return (

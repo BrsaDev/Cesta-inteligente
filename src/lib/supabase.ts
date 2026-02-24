@@ -31,6 +31,7 @@ export interface Product {
   name: string;
   brand: string;
   category: string;
+  tags?: string[];
   created_at: string;
 }
 
