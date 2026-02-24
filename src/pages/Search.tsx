@@ -11,6 +11,7 @@ import { AnimatePresence } from 'motion/react';
 import { X, UserCheck, Camera } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { normalizeString } from '@/src/lib/searchUtils';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 
 export const SearchPage = () => {
   const [searchParams] = useSearchParams();
@@ -32,6 +33,26 @@ export const SearchPage = () => {
     { id: '12', name: 'Bolacha Passatempo 130g', brand: 'Nestlé', price: 3.50, market: 'Mercado A', proof: false, time: '4h atrás', distance: '0.8km', icon: '🍪', tags: ['biscoito', 'bolacha', 'doce', 'recheado', 'lanche'] },
     { id: '13', name: 'Macarrão Espaguete 500g', brand: 'Adria', price: 5.90, market: 'Mercado C', proof: true, proofUrl: 'https://picsum.photos/seed/massa/600/800', time: '1h atrás', distance: '2.5km', icon: '🍝', tags: ['massa', 'macarrao', 'pasta', 'alimento'] },
   ];
+
+  // Mock aggregated history data (Optimized Rollups)
+  const mockHistoryData: Record<string, { date: string; price: number }[]> = {
+    '1': [
+      { date: '01/02', price: 4.80 }, { date: '05/02', price: 4.70 }, { date: '10/02', price: 4.60 },
+      { date: '15/02', price: 4.65 }, { date: '20/02', price: 4.55 }, { date: '24/02', price: 4.50 }
+    ],
+    '4': [
+      { date: '01/02', price: 9.50 }, { date: '05/02', price: 9.30 }, { date: '10/02', price: 9.10 },
+      { date: '15/02', price: 9.00 }, { date: '20/02', price: 8.95 }, { date: '24/02', price: 8.90 }
+    ],
+    '7': [
+      { date: '01/02', price: 17.50 }, { date: '05/02', price: 16.80 }, { date: '10/02', price: 16.20 },
+      { date: '15/02', price: 15.90 }, { date: '20/02', price: 15.70 }, { date: '24/02', price: 15.50 }
+    ],
+    '8': [
+      { date: '01/02', price: 42.00 }, { date: '05/02', price: 41.50 }, { date: '10/02', price: 40.00 },
+      { date: '15/02', price: 39.50 }, { date: '20/02', price: 39.00 }, { date: '24/02', price: 38.90 }
+    ]
+  };
 
   const fuse = new Fuse(allProducts, {
     keys: [
@@ -160,25 +181,68 @@ export const SearchPage = () => {
             )}
           </div>
 
-          {/* Price History Placeholder */}
-          <Card className="p-6 bg-slate-50 border-none">
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="font-bold text-slate-900">Histórico de preço</h4>
-              <div className="flex items-center text-green-600 text-xs font-bold">
-                <TrendingDown size={14} className="mr-1" />
-                -12% este mês
+          {/* Optimized Price History Chart */}
+          {results.length > 0 && mockHistoryData[results[0].id] && (
+            <Card className="p-6 bg-slate-50 border-none overflow-hidden">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h4 className="font-bold text-slate-900">Histórico de preço</h4>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">
+                    {results[0].name} • {results[0].brand}
+                  </p>
+                </div>
+                <div className="flex items-center text-green-600 text-xs font-bold bg-green-100 px-2 py-1 rounded-lg">
+                  <TrendingDown size={14} className="mr-1" />
+                  -12% este mês
+                </div>
               </div>
-            </div>
-            <div className="h-32 w-full flex items-end justify-between px-2">
-              {[40, 60, 45, 70, 55, 80, 65].map((h, i) => (
-                <div key={i} className="w-6 bg-primary/20 rounded-t-lg transition-all hover:bg-primary" style={{ height: `${h}%` }} />
-              ))}
-            </div>
-            <div className="flex justify-between mt-2 text-[10px] text-slate-400 font-bold uppercase">
-              <span>Semana 1</span>
-              <span>Hoje</span>
-            </div>
-          </Card>
+              
+              <div className="h-40 w-full -ml-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={mockHistoryData[results[0].id]}>
+                    <defs>
+                      <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis 
+                      dataKey="date" 
+                      hide 
+                    />
+                    <YAxis 
+                      hide 
+                      domain={['dataMin - 1', 'dataMax + 1']} 
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        borderRadius: '12px', 
+                        border: 'none', 
+                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                      }}
+                      formatter={(value: number) => [formatCurrency(value), 'Preço']}
+                      labelStyle={{ display: 'none' }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="price" 
+                      stroke="#22c55e" 
+                      strokeWidth={3}
+                      fillOpacity={1} 
+                      fill="url(#colorPrice)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              
+              <div className="flex justify-between mt-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                <span>Início do mês</span>
+                <span>Hoje</span>
+              </div>
+            </Card>
+          )}
         </section>
       ) : (
         <section className="py-12 text-center space-y-4">

@@ -1,5 +1,5 @@
 {
-  "name": "Cesta Inteligente",
+  "name": "Compra Inteligente",
   "description": "Compare preços de supermercados locais e economize na sua compra do mês.",
   "requestFramePermissions": [
     "camera",

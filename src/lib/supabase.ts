@@ -62,3 +62,12 @@ export interface ShoppingListItem {
   product_id: string;
   quantity: number;
 }
+
+export interface PriceHistoryDaily {
+  id: string;
+  product_id: string;
+  date: string; // YYYY-MM-DD
+  avg_price: number;
+  min_price: number;
+  max_price: number;
+}
