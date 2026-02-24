@@ -6,6 +6,8 @@ import { Input } from '@/src/components/ui/Input';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/src/lib/supabase';
+import Fuse from 'fuse.js';
+import { normalizeString } from '@/src/lib/searchUtils';
 
 export const CreateList = () => {
   const navigate = useNavigate();
@@ -17,6 +19,21 @@ export const CreateList = () => {
   const suggestions = [
     'Arroz 5kg', 'Leite Integral', 'Café 500g', 'Feijão Preto', 'Açúcar 1kg', 'Óleo de Soja'
   ];
+
+  const fuse = new Fuse(suggestions.map(s => ({ name: s })), {
+    keys: ['name'],
+    threshold: 0.3,
+    distance: 100,
+    ignoreLocation: true,
+    getFn: (obj, path) => {
+      const value = (obj as any)[path as string];
+      return typeof value === 'string' ? normalizeString(value) : value;
+    }
+  });
+
+  const filteredSuggestions = search 
+    ? fuse.search(normalizeString(search)).map(r => r.item.name)
+    : [];
 
   const addItem = (name: string) => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -102,7 +119,7 @@ export const CreateList = () => {
           />
           {search && (
             <div className="absolute top-full left-0 right-0 z-20 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-              {!suggestions.some(s => s.toLowerCase() === search.toLowerCase()) && (
+              {!suggestions.some(s => normalizeString(s) === normalizeString(search)) && (
                 <button
                   onClick={() => addItem(search)}
                   className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-bold text-primary flex items-center justify-between border-b border-slate-50"
@@ -111,7 +128,7 @@ export const CreateList = () => {
                   <Plus size={16} />
                 </button>
               )}
-              {suggestions.filter(s => s.toLowerCase().includes(search.toLowerCase())).map(s => (
+              {filteredSuggestions.map(s => (
                 <button
                   key={s}
                   onClick={() => addItem(s)}

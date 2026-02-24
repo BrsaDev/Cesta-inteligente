@@ -9,6 +9,8 @@ import { motion } from 'motion/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import { X, UserCheck, Camera } from 'lucide-react';
+import Fuse from 'fuse.js';
+import { normalizeString } from '@/src/lib/searchUtils';
 
 export const SearchPage = () => {
   const [searchParams] = useSearchParams();
@@ -23,13 +25,29 @@ export const SearchPage = () => {
     { id: '5', name: 'Feijão Preto 1kg', brand: 'Camil', price: 7.50, market: 'Mercado B', proof: true, proofUrl: 'https://picsum.photos/seed/feijao2/600/800', time: '30min atrás', distance: '1.2km', icon: '🥘' },
     { id: '6', name: 'Arroz Branco 5kg', brand: 'Tio João', price: 22.90, market: 'Mercado X', proof: true, proofUrl: 'https://picsum.photos/seed/arroz/600/800', time: '5h atrás', distance: '3.0km', icon: '🍚' },
     { id: '7', name: 'Café Torrado 500g', brand: 'Pilão', price: 15.50, market: 'Mercado Z', proof: false, time: '1h atrás', distance: '1.5km', icon: '☕' },
+    { id: '8', name: 'Alcatra Bovina kg', brand: 'Friboi', price: 38.90, market: 'Mercado A', proof: true, proofUrl: 'https://picsum.photos/seed/carne1/600/800', time: '45min atrás', distance: '0.8km', icon: '🥩' },
+    { id: '9', name: 'Peito de Frango 1kg', brand: 'Seara', price: 18.50, market: 'Mercado B', proof: false, time: '2h atrás', distance: '1.2km', icon: '🍗' },
+    { id: '10', name: 'Contra Filé kg', brand: 'Swift', price: 42.00, market: 'Mercado C', proof: true, proofUrl: 'https://picsum.photos/seed/carne2/600/800', time: '1h atrás', distance: '2.5km', icon: '🥩' },
   ];
 
+  const fuse = new Fuse(allProducts, {
+    keys: [
+      { name: 'name', weight: 0.7 },
+      { name: 'brand', weight: 0.3 }
+    ],
+    threshold: 0.3,
+    distance: 100,
+    minMatchCharLength: 2,
+    includeScore: true,
+    ignoreLocation: true,
+    getFn: (obj, path) => {
+      const value = (obj as any)[path as string];
+      return typeof value === 'string' ? normalizeString(value) : value;
+    }
+  });
+
   const results = search 
-    ? allProducts.filter(p => 
-        p.name.toLowerCase().includes(search.toLowerCase()) || 
-        p.brand.toLowerCase().includes(search.toLowerCase())
-      )
+    ? fuse.search(normalizeString(search)).map(r => r.item)
     : [];
 
   return (
@@ -153,7 +171,7 @@ export const SearchPage = () => {
             <p className="text-sm text-slate-500 mt-1">Busque por produtos ou marcas para ver os melhores preços.</p>
           </div>
           <div className="flex flex-wrap justify-center gap-2 pt-4">
-            {['Arroz', 'Feijão', 'Óleo', 'Leite', 'Café'].map(tag => (
+            {['Arroz', 'Feijão', 'Carne', 'Leite', 'Café'].map(tag => (
               <button key={tag} onClick={() => setSearch(tag)} className="px-4 py-2 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-600 hover:border-primary hover:text-primary transition-all">
                 {tag}
               </button>
