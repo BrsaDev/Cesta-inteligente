@@ -347,46 +347,46 @@ export const SearchPage = () => {
                     transition={{ delay: idx * 0.1 }}
                     className="space-y-2"
                   >
-                    <Card className="p-4 bg-white border-none shadow-sm relative overflow-hidden" hoverable>
-                      <div className="flex justify-between items-start relative z-10">
-                        <div className="flex space-x-3">
-                          <div className="h-14 w-14 rounded-2xl bg-slate-100 flex items-center justify-center text-xl shrink-0 overflow-hidden">
+                    <Card className="p-3 sm:p-4 bg-white border-none shadow-sm relative overflow-hidden" hoverable>
+                      <div className="flex justify-between items-start relative z-10 gap-2">
+                        <div className="flex space-x-2 sm:space-x-3 min-w-0">
+                          <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl bg-slate-100 flex items-center justify-center text-lg sm:text-xl shrink-0 overflow-hidden">
                             {group.imageUrl ? (
                               <img src={group.imageUrl} alt={group.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             ) : '🛒'}
                           </div>
                           <div className="min-w-0">
-                            <h3 className="font-bold text-slate-900 truncate">{group.name}</h3>
-                            <p className="text-xs text-slate-500 truncate">{group.brand}</p>
-                            <div className="flex items-center mt-2 space-x-3">
-                              <div className="flex items-center text-[10px] text-slate-400 font-bold uppercase">
-                                <MapPin size={10} className="mr-1" />
+                            <h3 className="font-bold text-slate-900 text-sm sm:text-base truncate leading-tight">{group.name}</h3>
+                            <p className="text-[10px] sm:text-xs text-slate-500 truncate">{group.brand}</p>
+                            <div className="flex items-center mt-1.5 space-x-2 sm:space-x-3">
+                              <div className="flex items-center text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase">
+                                <MapPin size={10} className="mr-0.5 sm:mr-1" />
                                 {bestPrice.distance}
                               </div>
-                              <div className="flex items-center text-[10px] text-slate-400 font-bold uppercase">
-                                <Clock size={10} className="mr-1" />
+                              <div className="flex items-center text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase">
+                                <Clock size={10} className="mr-0.5 sm:mr-1" />
                                 {bestPrice.time}
                               </div>
                             </div>
                           </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-xl font-bold text-primary">{formatCurrency(bestPrice.price)}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">{bestPrice.market}</p>
+                        <div className="text-right shrink-0 flex flex-col items-end">
+                          <p className="text-base sm:text-xl font-bold text-primary leading-none">{formatCurrency(bestPrice.price)}</p>
+                          <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase mt-1 truncate max-w-[80px] sm:max-w-none">{bestPrice.market}</p>
                           <div className="flex flex-col items-end space-y-1 mt-2">
                             {bestPrice.flashSale && (
-                              <div className="flex items-center bg-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-md animate-pulse">
-                                <Zap size={10} className="mr-1 fill-current" />
-                                RELÂMPAGO • {bestPrice.flashSale.endsIn}
+                              <div className="flex items-center bg-red-500 text-white text-[8px] sm:text-[9px] font-bold px-1.5 sm:px-2 py-0.5 rounded-md animate-pulse">
+                                <Zap size={8} className="mr-1 fill-current" />
+                                {bestPrice.flashSale.endsIn}
                               </div>
                             )}
                             {bestPrice.hasProof && (
                               <button 
                                 onClick={() => setSelectedProof(bestPrice.proofUrl || null)}
-                                className="inline-flex items-center text-[9px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded-md font-bold uppercase hover:bg-green-200 transition-colors"
+                                className="inline-flex items-center text-[8px] sm:text-[9px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded-md font-bold uppercase hover:bg-green-200 transition-colors whitespace-nowrap"
                               >
                                 <Camera size={10} className="mr-1" />
-                                Verificado • Ver Foto
+                                <span className="hidden xs:inline">Verificado • </span>Foto
                               </button>
                             )}
                           </div>

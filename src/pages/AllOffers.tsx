@@ -329,12 +329,12 @@ export const AllOffers = () => {
                   className="space-y-2"
                 >
                   {/* Main Product Card (Best Price) */}
-                  <Card className="p-4 bg-white border-none shadow-sm relative overflow-hidden" hoverable>
-                    <div className="flex items-center justify-between relative z-10">
-                      <div className="flex items-center space-x-4">
-                        <div className="h-14 w-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 relative shrink-0">
+                  <Card className="p-3 sm:p-4 bg-white border-none shadow-sm relative overflow-hidden" hoverable>
+                    <div className="flex items-center justify-between relative z-10 gap-2">
+                      <div className="flex items-center space-x-3 sm:space-x-4 min-w-0">
+                        <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 relative shrink-0 overflow-hidden">
                           {group.imageUrl ? (
-                            <img src={group.imageUrl} alt={group.name} className="w-full h-full object-cover rounded-2xl" referrerPolicy="no-referrer" />
+                            <img src={group.imageUrl} alt={group.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           ) : '🛒'}
                           {bestPrice.hasProof && (
                             <div className="absolute -top-1 -right-1 h-4 w-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
@@ -343,23 +343,23 @@ export const AllOffers = () => {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-bold text-slate-900 truncate">{group.name}</p>
+                          <p className="font-bold text-slate-900 text-sm sm:text-base truncate leading-tight">{group.name}</p>
                           <div className="flex items-center space-x-2 mt-0.5">
-                            <span className="text-[10px] font-bold text-primary uppercase truncate">{bestPrice.market}</span>
+                            <span className="text-[9px] sm:text-[10px] font-bold text-primary uppercase truncate">{bestPrice.market}</span>
                             <span className="text-slate-300">•</span>
-                            <span className="text-[10px] text-slate-400 font-medium">{group.category}</span>
+                            <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium truncate">{group.category}</span>
                           </div>
                         </div>
                       </div>
                       <div className="text-right flex flex-col items-end space-y-1 shrink-0">
-                        <p className="font-bold text-primary text-xl">{formatCurrency(bestPrice.price)}</p>
+                        <p className="font-bold text-primary text-base sm:text-xl leading-none">{formatCurrency(bestPrice.price)}</p>
                         {bestPrice.flashSale ? (
-                          <span className="text-[9px] bg-red-500 text-white px-2 py-0.5 rounded-full font-bold uppercase animate-pulse flex items-center">
+                          <span className="text-[8px] sm:text-[9px] bg-red-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-bold uppercase animate-pulse flex items-center">
                             <Zap size={8} className="mr-1 fill-current" />
                             {bestPrice.flashSale.endsIn}
                           </span>
                         ) : (
-                          <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full font-bold uppercase">Melhor Preço</span>
+                          <span className="text-[8px] sm:text-[10px] bg-green-50 text-green-600 px-1.5 sm:px-2 py-0.5 rounded-full font-bold uppercase">Melhor Preço</span>
                         )}
                       </div>
                     </div>
