@@ -4,6 +4,7 @@ import { SearchPage } from './pages/Search';
 import { MyLists } from './pages/MyLists';
 import { CreateList } from './pages/CreateList';
 import { Results } from './pages/Results';
+import { AllOffers } from './pages/AllOffers';
 import { Contribute } from './pages/Contribute';
 import { Profile } from './pages/Profile';
 import { MarketPanel } from './pages/MarketPanel';
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="/contribute" element={<Contribute />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/results" element={<Results />} />
+            <Route path="/offers" element={<AllOffers />} />
             <Route path="/market" element={<MarketPanel />} />
             <Route path="/economy-details" element={<EconomyDetails />} />
           </Routes>

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash2, Calculator, Search, X } from 'lucide-react';
 import { Card } from '@/src/components/ui/Card';
 import { Button } from '@/src/components/ui/Button';
@@ -8,18 +8,37 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/src/lib/supabase';
 import Fuse from 'fuse.js';
 import { normalizeString } from '@/src/lib/searchUtils';
-import { PRODUCTS } from '../data/mockData';
 
 export const CreateList = () => {
   const navigate = useNavigate();
   const [listName, setListName] = useState('Compra do mês');
-  const [items, setItems] = useState<{ id: string; name: string; quantity: number }[]>([]);
+  const [items, setItems] = useState<{ id: string; productId?: string; name: string; quantity: number }[]>([]);
   const [search, setSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [suggestions, setSuggestions] = useState<{ id: string; name: string }[]>([]);
 
-  const suggestions = useMemo(() => PRODUCTS.map(p => p.name), []);
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (search.length < 2) {
+        setSuggestions([]);
+        return;
+      }
+      const { data } = await supabase
+        .from('products')
+        .select('id, name')
+        .ilike('name', `%${search}%`)
+        .limit(5);
+      
+      if (data) {
+        setSuggestions(data);
+      }
+    };
 
-  const fuse = useMemo(() => new Fuse(suggestions.map(s => ({ name: s })), {
+    const timeoutId = setTimeout(fetchSuggestions, 300);
+    return () => clearTimeout(timeoutId);
+  }, [search]);
+
+  const fuse = useMemo(() => new Fuse(suggestions, {
     keys: ['name'],
     threshold: 0.2,
     distance: 100,
@@ -42,12 +61,12 @@ export const CreateList = () => {
           }
           return true;
         })
-        .map(r => r.item.name)
+        .map(r => r.item)
     : [];
 
-  const addItem = (name: string) => {
+  const addItem = (name: string, productId?: string) => {
     const id = Math.random().toString(36).substr(2, 9);
-    setItems([...items, { id, name, quantity: 1 }]);
+    setItems([...items, { id, productId, name, quantity: 1 }]);
     setSearch('');
   };
 
@@ -69,29 +88,61 @@ export const CreateList = () => {
       // 1. Create the list
       const { data: listData, error: listError } = await supabase
         .from('shopping_lists')
-        .insert([{ name: listName, user_id: 'temp-user-id' }]) // In a real app, use auth user id
+        .insert([{ name: listName }]) // Removed invalid user_id
         .select()
         .single();
 
       if (listError) throw listError;
 
-      // 2. Add items (mocking product_id for now as we don't have a full product DB yet)
-      const listItems = items.map(item => ({
-        list_id: listData.id,
-        product_id: 'temp-product-id', // This would be a real ID from search
-        quantity: item.quantity
-      }));
+      // 2. Prepare items, ensuring all products exist in the DB
+      const finalItems = [];
+      
+      for (const item of items) {
+        let pId = item.productId;
+        
+        // If product doesn't have an ID, it's a custom item, try to find or create it
+        if (!pId) {
+          const { data: existingProd } = await supabase
+            .from('products')
+            .select('id')
+            .ilike('name', item.name)
+            .single();
+            
+          if (existingProd) {
+            pId = existingProd.id;
+          } else {
+            const { data: newProd, error: prodError } = await supabase
+              .from('products')
+              .insert([{ name: item.name, category: 'Geral' }])
+              .select()
+              .single();
+            
+            if (!prodError && newProd) {
+              pId = newProd.id;
+            }
+          }
+        }
 
-      const { error: itemsError } = await supabase
-        .from('shopping_list_items')
-        .insert(listItems);
+        if (pId) {
+          finalItems.push({
+            list_id: listData.id,
+            product_id: pId,
+            quantity: item.quantity
+          });
+        }
+      }
 
-      if (itemsError) throw itemsError;
+      if (finalItems.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('shopping_list_items')
+          .insert(finalItems);
+
+        if (itemsError) throw itemsError;
+      }
 
       navigate(`/results?listId=${listData.id}`);
     } catch (error) {
       console.error('Error saving list:', error);
-      // Still navigate for demo purposes if Supabase fails
       navigate('/results');
     } finally {
       setIsSaving(false);
@@ -129,25 +180,31 @@ export const CreateList = () => {
           />
           {search && (
             <div className="absolute top-full left-0 right-0 z-20 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-              {!suggestions.some(s => normalizeString(s) === normalizeString(search)) && (
-                <button
-                  onClick={() => addItem(search)}
-                  className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-bold text-primary flex items-center justify-between border-b border-slate-50"
-                >
-                  <span>Adicionar "{search}"</span>
-                  <Plus size={16} />
-                </button>
-              )}
               {filteredSuggestions.map(s => (
                 <button
-                  key={s}
-                  onClick={() => addItem(s)}
-                  className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center justify-between"
+                  key={s.id}
+                  onClick={() => addItem(s.name, s.id)}
+                  className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center justify-between border-b border-slate-50 last:border-0"
                 >
-                  {s}
+                  <div className="flex flex-col">
+                    <span className="font-bold">{s.name}</span>
+                    <span className="text-[10px] text-primary uppercase font-bold">Produto com preços cadastrados</span>
+                  </div>
                   <Plus size={16} className="text-primary" />
                 </button>
               ))}
+              {!suggestions.some(s => normalizeString(s.name) === normalizeString(search)) && (
+                <button
+                  onClick={() => addItem(search)}
+                  className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-bold text-slate-400 flex items-center justify-between"
+                >
+                  <div className="flex flex-col">
+                    <span>Adicionar "{search}"</span>
+                    <span className="text-[9px] uppercase font-bold">Item personalizado (sem comparação)</span>
+                  </div>
+                  <Plus size={16} />
+                </button>
+              )}
             </div>
           )}
         </div>

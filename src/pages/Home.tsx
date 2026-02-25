@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, MapPin, Plus, ArrowRight, TrendingDown, List, Zap } from 'lucide-react';
 import { Card } from '@/src/components/ui/Card';
 import { Button } from '@/src/components/ui/Button';
@@ -6,29 +6,55 @@ import { Input } from '@/src/components/ui/Input';
 import { formatCurrency } from '@/src/lib/utils';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { PRODUCTS, PRICES } from '../data/mockData';
+import { supabase } from '@/src/lib/supabase';
 
 export const Home = () => {
   const navigate = useNavigate();
   const [userName] = useState('Bruno');
   const [location] = useState('Cabo Frio, RJ');
+  const [offers, setOffers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const offers = useMemo(() => {
-    // Get 3 random products and their best prices
-    return PRODUCTS.slice(0, 3).map(product => {
-      const productPrices = PRICES.filter(p => p.marketId === 'm1'); // Just an example
-      const priceObj = productPrices[Math.floor(Math.random() * productPrices.length)] || { price: 0, marketName: 'Mercado' };
-      
-      return {
-        id: product.id,
-        name: product.name,
-        price: 15.90 + Math.random() * 10, // Random price for variety
-        market: ['Barcelos', 'Lufelana', 'Bons Frutos'][Math.floor(Math.random() * 3)],
-        time: '2h atrás',
-        type: 'promo',
-        flashSale: Math.random() > 0.5 ? { endsIn: '05:20:00' } : null
-      };
-    });
+  useEffect(() => {
+    const fetchOffers = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('prices')
+          .select(`
+            id,
+            price,
+            has_proof,
+            created_at,
+            products (id, name, brand, category, image_url),
+            markets (name)
+          `)
+          .eq('is_active', true)
+          .order('price', { ascending: true })
+          .limit(5);
+
+        if (error) throw error;
+
+        if (data) {
+          setOffers(data.map((item: any) => ({
+            id: item.id, // Use price ID for uniqueness
+            productId: item.products.id,
+            name: item.products.name,
+            price: item.price,
+            market: item.markets.name,
+            time: 'Recente',
+            type: 'promo',
+            flashSale: Math.random() > 0.8 ? { endsIn: '05:20:00' } : null
+          })));
+        }
+      } catch (error) {
+        console.error('Error fetching offers:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchOffers();
   }, []);
 
   return (
@@ -92,40 +118,56 @@ export const Home = () => {
       <section className="space-y-4">
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-bold text-slate-900">Ofertas próximas 🔥</h2>
-          <Button variant="ghost" size="sm" className="text-primary">Ver todas</Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-primary"
+            onClick={() => navigate('/offers')}
+          >
+            Ver todas
+          </Button>
         </div>
         <div className="space-y-3">
-          {offers.map((offer, idx) => (
-            <motion.div
-              key={offer.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
-            >
-              <Card className="flex items-center justify-between p-4" hoverable>
-                <div className="flex items-center space-x-4">
-                  <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
-                    🛒
+          {isLoading ? (
+            <div className="py-8 text-center text-slate-400 text-sm">Carregando ofertas...</div>
+          ) : offers.length > 0 ? (
+            offers.map((offer, idx) => (
+              <motion.div
+                key={offer.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.1 }}
+              >
+                <Card className="flex items-center justify-between p-4" hoverable>
+                  <div className="flex items-center space-x-4">
+                    <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
+                      🛒
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900">{offer.name}</p>
+                      <p className="text-xs text-slate-500">{offer.market} • {offer.time}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-bold text-slate-900">{offer.name}</p>
-                    <p className="text-xs text-slate-500">{offer.market} • {offer.time}</p>
+                  <div className="text-right flex flex-col items-end space-y-1">
+                    <p className="font-bold text-primary">{formatCurrency(offer.price)}</p>
+                    {offer.flashSale ? (
+                      <span className="text-[9px] bg-red-500 text-white px-2 py-0.5 rounded-full font-bold uppercase animate-pulse flex items-center">
+                        <Zap size={8} className="mr-1 fill-current" />
+                        {offer.flashSale.endsIn}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-green-100 text-green-600 px-2 py-0.5 rounded-full font-bold uppercase">Promoção</span>
+                    )}
                   </div>
-                </div>
-                <div className="text-right flex flex-col items-end space-y-1">
-                  <p className="font-bold text-primary">{formatCurrency(offer.price)}</p>
-                  {offer.flashSale ? (
-                    <span className="text-[9px] bg-red-500 text-white px-2 py-0.5 rounded-full font-bold uppercase animate-pulse flex items-center">
-                      <Zap size={8} className="mr-1 fill-current" />
-                      {offer.flashSale.endsIn}
-                    </span>
-                  ) : (
-                    <span className="text-[10px] bg-green-100 text-green-600 px-2 py-0.5 rounded-full font-bold uppercase">Promoção</span>
-                  )}
-                </div>
-              </Card>
-            </motion.div>
-          ))}
+                </Card>
+              </motion.div>
+            ))
+          ) : (
+            <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+              <p className="text-slate-400 text-sm">Nenhuma oferta encontrada.</p>
+              <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold">Verifique se o banco de dados foi populado</p>
+            </div>
+          )}
         </div>
       </section>
 

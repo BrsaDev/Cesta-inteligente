@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, Filter, SlidersHorizontal, TrendingUp, TrendingDown, Clock, MapPin, Zap } from 'lucide-react';
 import { Card } from '@/src/components/ui/Card';
 import { Input } from '@/src/components/ui/Input';
@@ -8,10 +8,9 @@ import { motion } from 'motion/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import { X, UserCheck, Camera } from 'lucide-react';
-import Fuse from 'fuse.js';
 import { normalizeString } from '@/src/lib/searchUtils';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
-import { PRODUCTS, PRICES } from '../data/mockData';
+import { supabase } from '@/src/lib/supabase';
 
 interface ProductItem {
   id: string;
@@ -32,82 +31,66 @@ export const SearchPage = () => {
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get('q') || '');
   const [selectedProof, setSelectedProof] = useState<string | null>(null);
-  
-  const allProducts = useMemo<ProductItem[]>(() => {
-    return PRICES.map((price, idx) => {
-      const pIdx = Math.floor(idx / 3);
-      const prod = PRODUCTS[pIdx];
-      
-      return {
-        id: `${prod.id}-${price.marketId}`,
-        name: prod.name,
-        brand: prod.brand,
-        price: price.price,
-        market: price.marketName,
-        proof: !!price.hasProof,
-        proofUrl: `https://picsum.photos/seed/${prod.id}/600/800`,
-        time: '1h atrás',
-        distance: '0.8km',
-        icon: '🛒',
-        flashSale: Math.random() > 0.8 ? { endsIn: '02:45:12' } : null,
-        tags: [prod.category.toLowerCase(), prod.brand.toLowerCase()]
-      };
-    });
-  }, []);
+  const [results, setResults] = useState<ProductItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Mock aggregated history data (Optimized Rollups)
-  const mockHistoryData: Record<string, { date: string; price: number }[]> = {
-    '1': [
-      { date: '01/02', price: 4.80 }, { date: '05/02', price: 4.70 }, { date: '10/02', price: 4.60 },
-      { date: '15/02', price: 4.65 }, { date: '20/02', price: 4.55 }, { date: '24/02', price: 4.50 }
-    ],
-    '4': [
-      { date: '01/02', price: 9.50 }, { date: '05/02', price: 9.30 }, { date: '10/02', price: 9.10 },
-      { date: '15/02', price: 9.00 }, { date: '20/02', price: 8.95 }, { date: '24/02', price: 8.90 }
-    ],
-    '7': [
-      { date: '01/02', price: 17.50 }, { date: '05/02', price: 16.80 }, { date: '10/02', price: 16.20 },
-      { date: '15/02', price: 15.90 }, { date: '20/02', price: 15.70 }, { date: '24/02', price: 15.50 }
-    ],
-    '8': [
-      { date: '01/02', price: 42.00 }, { date: '05/02', price: 41.50 }, { date: '10/02', price: 40.00 },
-      { date: '15/02', price: 39.50 }, { date: '20/02', price: 39.00 }, { date: '24/02', price: 38.90 }
-    ]
-  };
+  useEffect(() => {
+    const performSearch = async () => {
+      if (!search.trim()) {
+        setResults([]);
+        return;
+      }
 
-  const fuse = useMemo(() => new Fuse<ProductItem>(allProducts, {
-    keys: [
-      { name: 'name', weight: 0.6 },
-      { name: 'tags', weight: 0.3 },
-      { name: 'brand', weight: 0.1 }
-    ],
-    threshold: 0.2,
-    distance: 100,
-    minMatchCharLength: 3,
-    includeScore: true,
-    ignoreLocation: false, // Changed to false to respect word boundaries better
-    location: 0,
-    getFn: (obj, path) => {
-      const value = (obj as any)[path as string];
-      return typeof value === 'string' ? normalizeString(value) : value;
-    }
-  }), [allProducts]);
+      setIsLoading(true);
+      try {
+        // Use !inner to filter by joined table column
+        const { data, error } = await supabase
+          .from('prices')
+          .select(`
+            id,
+            price,
+            has_proof,
+            proof_url,
+            created_at,
+            products!inner (id, name, brand, category, image_url),
+            markets (name)
+          `)
+          .ilike('products.name', `%${search}%`)
+          .eq('is_active', true)
+          .order('price', { ascending: true });
 
-  const results = useMemo(() => {
-    if (!search) return [];
-    return fuse.search(normalizeString(search))
-      .filter(r => {
-        if (r.score && r.score > 0.1) {
-          const name = normalizeString(r.item.name);
-          const query = normalizeString(search);
-          const isAtWordBoundary = name.split(/\s+/).some(word => word.startsWith(query));
-          const isTagMatch = r.item.tags?.some(tag => normalizeString(tag) === query);
-          return isAtWordBoundary || isTagMatch;
+        if (error) {
+          console.error('Search error:', error);
+          setResults([]);
+          return;
         }
-        return true;
-      })
-      .map(r => r.item);
-  }, [search, fuse]);
+
+        if (data) {
+          setResults(data.map((item: any) => ({
+            id: item.id,
+            name: item.products.name,
+            brand: item.products.brand,
+            price: item.price,
+            market: item.markets.name,
+            proof: item.has_proof,
+            proofUrl: item.proof_url,
+            time: 'Recente',
+            distance: '1.0km',
+            icon: '🛒',
+            flashSale: null,
+            tags: [item.products.category]
+          })));
+        }
+      } catch (error) {
+        console.error('Search catch error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const timeoutId = setTimeout(performSearch, 300);
+    return () => clearTimeout(timeoutId);
+  }, [search]);
 
   return (
     <div className="pb-24 pt-6 px-4 space-y-6 max-w-lg mx-auto">
@@ -138,10 +121,15 @@ export const SearchPage = () => {
           </div>
 
           <div className="space-y-3">
-            {results.length > 0 ? (
+            {isLoading ? (
+              <div className="py-12 text-center text-slate-400">
+                <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-sm font-medium">Buscando produtos...</p>
+              </div>
+            ) : results.length > 0 ? (
               results.map((item, idx) => (
                 <motion.div
-                  key={item.id}
+                  key={`${item.id}-${idx}`}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.1 }}
@@ -200,8 +188,8 @@ export const SearchPage = () => {
             )}
           </div>
 
-          {/* Optimized Price History Chart */}
-          {results.length > 0 && mockHistoryData[results[0].id] && (
+          {/* Price History Chart (Placeholder for now) */}
+          {results.length > 0 && (
             <Card className="p-6 bg-slate-50 border-none overflow-hidden">
               <div className="flex justify-between items-center mb-6">
                 <div>
@@ -216,44 +204,8 @@ export const SearchPage = () => {
                 </div>
               </div>
               
-              <div className="h-40 w-full -ml-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={mockHistoryData[results[0].id]}>
-                    <defs>
-                      <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <XAxis 
-                      dataKey="date" 
-                      hide 
-                    />
-                    <YAxis 
-                      hide 
-                      domain={['dataMin - 1', 'dataMax + 1']} 
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        borderRadius: '12px', 
-                        border: 'none', 
-                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                        fontSize: '12px',
-                        fontWeight: 'bold'
-                      }}
-                      formatter={(value: number) => [formatCurrency(value), 'Preço']}
-                      labelStyle={{ display: 'none' }}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="price" 
-                      stroke="#22c55e" 
-                      strokeWidth={3}
-                      fillOpacity={1} 
-                      fill="url(#colorPrice)" 
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+              <div className="h-40 w-full -ml-4 flex items-center justify-center text-slate-300 text-xs font-bold uppercase">
+                Gráfico de histórico em breve
               </div>
               
               <div className="flex justify-between mt-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
