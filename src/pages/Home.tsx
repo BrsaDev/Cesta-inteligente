@@ -1,23 +1,35 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Search, MapPin, Plus, ArrowRight, TrendingDown, List, Zap } from 'lucide-react';
 import { Card } from '@/src/components/ui/Card';
 import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import { formatCurrency } from '@/src/lib/utils';
 import { motion } from 'motion/react';
-
 import { useNavigate } from 'react-router-dom';
+import { PRODUCTS, PRICES } from '../data/mockData';
 
 export const Home = () => {
   const navigate = useNavigate();
   const [userName] = useState('Bruno');
   const [location] = useState('Cabo Frio, RJ');
 
-  const offers = [
-    { id: '1', name: 'Arroz 5kg', price: 22.90, market: 'Mercado X', time: '2h atrás', type: 'promo', flashSale: { endsIn: '05:20:00' } },
-    { id: '2', name: 'Leite Integral', price: 4.99, market: 'Mercado Y', time: '1h atrás', type: 'promo' },
-    { id: '3', name: 'Café 500g', price: 15.50, market: 'Mercado Z', time: '30min atrás', type: 'promo', flashSale: { endsIn: '00:45:00' } },
-  ];
+  const offers = useMemo(() => {
+    // Get 3 random products and their best prices
+    return PRODUCTS.slice(0, 3).map(product => {
+      const productPrices = PRICES.filter(p => p.marketId === 'm1'); // Just an example
+      const priceObj = productPrices[Math.floor(Math.random() * productPrices.length)] || { price: 0, marketName: 'Mercado' };
+      
+      return {
+        id: product.id,
+        name: product.name,
+        price: 15.90 + Math.random() * 10, // Random price for variety
+        market: ['Barcelos', 'Lufelana', 'Bons Frutos'][Math.floor(Math.random() * 3)],
+        time: '2h atrás',
+        type: 'promo',
+        flashSale: Math.random() > 0.5 ? { endsIn: '05:20:00' } : null
+      };
+    });
+  }, []);
 
   return (
     <div className="pb-24 pt-6 px-4 space-y-8 max-w-lg mx-auto">

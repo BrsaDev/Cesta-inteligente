@@ -1,17 +1,20 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Trophy, Store, Zap, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Trophy, Store, Zap, CheckCircle2, ChevronDown, ChevronUp, Info, Medal } from 'lucide-react';
 import { Card } from '@/src/components/ui/Card';
 import { Button } from '@/src/components/ui/Button';
 import { formatCurrency } from '@/src/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/src/lib/supabase';
+import { MARKETS, PRICES, PRODUCTS } from '../data/mockData';
 
 export const Results = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const listId = searchParams.get('listId');
   const [listName, setListName] = useState('Resultado da compra');
+  const [expandedMultiMarket, setExpandedMultiMarket] = useState<string | null>(null);
+  const [expandedSingleMarket, setExpandedSingleMarket] = useState<string | null>(null);
 
   useEffect(() => {
     if (listId) {
@@ -34,34 +37,64 @@ export const Results = () => {
     }
   };
 
-  const [showDetails, setShowDetails] = useState(false);
+  // Mock items if no listId is provided (for demo)
+  const listItems = useMemo(() => [
+    'Arroz Branco 5kg', 'Feijão Carioca 1kg', 'Leite Integral 1L', 'Café Torrado 500g', 'Açúcar Refinado 1kg', 'Óleo de Soja 900ml'
+  ], []);
 
-  const multiMarket = {
-    total: 167.50,
-    savings: 32.40,
-    markets: [
-      { name: 'Mercado A', items: ['Arroz 5kg', 'Feijão Preto', 'Açúcar 1kg', 'Sal Refinado', 'Macarrão Espaguete'], subtotal: 45.20 },
-      { name: 'Mercado B', items: ['Leite Integral (12x)', 'Café 500g', 'Óleo de Soja', 'Detergente Líquido'], subtotal: 122.30 },
-    ]
-  };
+  const multiMarket = useMemo(() => {
+    let total = 0;
+    const marketGroups: Record<string, { id: string; name: string; items: { name: string; price: number }[]; subtotal: number }> = {};
 
-  const singleMarket = {
-    name: 'Mercado X',
-    total: 175.90,
-    savings: 24.00,
-    score: 98,
-    items: [
-      { name: 'Arroz 5kg', price: 23.90 },
-      { name: 'Feijão Preto', price: 8.50 },
-      { name: 'Leite Integral (12x)', price: 59.88 },
-      { name: 'Café 500g', price: 16.50 },
-      { name: 'Açúcar 1kg', price: 4.20 },
-      { name: 'Óleo de Soja', price: 6.90 },
-    ]
-  };
+    listItems.forEach(itemName => {
+      // Find best price for this item across all markets
+      const itemPrices = PRICES.filter(p => p.marketName === 'Barcelos' || p.marketName === 'Lufelana' || p.marketName === 'Bons Frutos')
+        .filter(p => {
+          // In a real app we'd match by product ID, here we match by name for the mock
+          return true;
+        });
+      
+      // Pick the best market for each item (mock logic)
+      const bestPrice = 5 + Math.random() * 20;
+      const bestMarket = MARKETS[Math.floor(Math.random() * MARKETS.length)];
+      
+      total += bestPrice;
+      if (!marketGroups[bestMarket.id]) {
+        marketGroups[bestMarket.id] = { id: bestMarket.id, name: bestMarket.name, items: [], subtotal: 0 };
+      }
+      marketGroups[bestMarket.id].items.push({ name: itemName, price: bestPrice });
+      marketGroups[bestMarket.id].subtotal += bestPrice;
+    });
 
-  const truncateItems = (items: string[]) => {
-    const text = items.join(', ');
+    return {
+      total,
+      savings: total * 0.18,
+      markets: Object.values(marketGroups)
+    };
+  }, [listItems]);
+
+  const singleMarketRanking = useMemo(() => {
+    return MARKETS.map(market => {
+      let total = 0;
+      const items = listItems.map(name => {
+        const price = 6 + Math.random() * 22;
+        total += price;
+        return { name, price };
+      });
+
+      return {
+        id: market.id,
+        name: market.name,
+        total,
+        savings: total * 0.1,
+        score: 100,
+        items
+      };
+    }).sort((a, b) => a.total - b.total).slice(0, 3);
+  }, [listItems]);
+
+  const truncateItems = (items: { name: string }[]) => {
+    const text = items.map(i => i.name).join(', ');
     return text.length > 40 ? text.substring(0, 40) + '...' : text;
   };
 
@@ -76,12 +109,25 @@ export const Results = () => {
 
       {/* Multi-Market Option */}
       <section className="space-y-4">
-        <div className="flex items-center space-x-2">
-          <Trophy className="text-yellow-500" size={20} />
-          <h2 className="text-lg font-bold text-slate-900">Economia máxima</h2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Trophy className="text-yellow-500" size={20} />
+            <h2 className="text-lg font-bold text-slate-900">Economia máxima</h2>
+          </div>
+          <div className="flex items-center text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded-full font-bold uppercase tracking-wider">
+            <Info size={12} className="mr-1" />
+            Multi-mercado
+          </div>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-2">
+          <p className="text-xs text-blue-700 leading-relaxed">
+            <strong>Como funciona:</strong> Compramos cada item onde ele está mais barato. 
+            Você economiza mais, mas precisa visitar mais de um mercado.
+          </p>
         </div>
         
-        <Card className="bg-primary text-white border-none p-6 relative overflow-hidden">
+        <Card className="bg-emerald-500 text-white border-none p-6 relative overflow-hidden">
           <div className="relative z-10">
             <div className="flex justify-between items-start">
               <div>
@@ -94,22 +140,53 @@ export const Results = () => {
               </div>
             </div>
             
-            <div className="mt-6 space-y-4">
+            <div className="mt-6 space-y-3">
               {multiMarket.markets.map((m, idx) => (
-                <div key={idx} className="bg-black/10 rounded-2xl p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="flex items-center space-x-2">
-                      <Store size={16} />
-                      <span className="font-bold">{m.name}</span>
+                <div 
+                  key={idx} 
+                  className="bg-black/10 rounded-2xl overflow-hidden transition-all cursor-pointer hover:bg-black/20"
+                  onClick={() => setExpandedMultiMarket(expandedMultiMarket === m.id ? null : m.id)}
+                >
+                  <div className="p-4">
+                    <div className="flex justify-between items-center mb-1">
+                      <div className="flex items-center space-x-2">
+                        <Store size={16} />
+                        <span className="font-bold">{m.name}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-bold">{formatCurrency(m.subtotal)}</span>
+                        {expandedMultiMarket === m.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </div>
                     </div>
-                    <span className="text-sm font-medium">{formatCurrency(m.subtotal)}</span>
+                    {!expandedMultiMarket || expandedMultiMarket !== m.id ? (
+                      <p className="text-[11px] text-white/70">{truncateItems(m.items)}</p>
+                    ) : null}
                   </div>
-                  <p className="text-xs text-white/70">{truncateItems(m.items)}</p>
+                  
+                  <AnimatePresence>
+                    {expandedMultiMarket === m.id && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="bg-black/5 border-t border-white/10"
+                      >
+                        <div className="p-4 pt-2 space-y-2">
+                          {m.items.map((item, i) => (
+                            <div key={i} className="flex justify-between items-center text-xs">
+                              <span className="text-white/80">{item.name}</span>
+                              <span className="font-bold">{formatCurrency(item.price)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               ))}
             </div>
 
-            <Button className="w-full mt-6 bg-white text-primary hover:bg-white/90">
+            <Button className="w-full mt-6 bg-white text-emerald-600 hover:bg-white/90 font-bold">
               Ver rota otimizada
             </Button>
           </div>
@@ -119,66 +196,97 @@ export const Results = () => {
 
       {/* Single Market Option */}
       <section className="space-y-4">
-        <div className="flex items-center space-x-2">
-          <Zap className="text-secondary" size={20} />
-          <h2 className="text-lg font-bold text-slate-900">Mais prático</h2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Zap className="text-secondary" size={20} />
+            <h2 className="text-lg font-bold text-slate-900">Mais prático</h2>
+          </div>
+          <div className="flex items-center text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded-full font-bold uppercase tracking-wider">
+            <Info size={12} className="mr-1" />
+            Mercado único
+          </div>
         </div>
 
-        <Card className="p-6" hoverable>
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <div className="flex items-center space-x-2 mb-1">
-                <h3 className="text-xl font-bold text-slate-900">{singleMarket.name}</h3>
-                <CheckCircle2 size={16} className="text-primary" />
-              </div>
-              <p className="text-xs text-slate-500">Melhor mercado único</p>
-            </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-slate-900">{formatCurrency(singleMarket.total)}</p>
-              <p className="text-xs text-green-600 font-bold">Economia: {formatCurrency(singleMarket.savings)}</p>
-            </div>
-          </div>
-          
-          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-            <div className="bg-primary h-full" style={{ width: `${singleMarket.score}%` }} />
-          </div>
-          <div className="flex justify-between mt-2">
-            <span className="text-[10px] text-slate-400 font-bold uppercase">Disponibilidade</span>
-            <span className="text-[10px] text-primary font-bold">{singleMarket.score}% dos itens</span>
-          </div>
+        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 mb-2">
+          <p className="text-xs text-slate-600 leading-relaxed">
+            <strong>Como funciona:</strong> Mostramos os melhores mercados para você fazer a compra completa 
+            em um só lugar. Mais rápido e conveniente.
+          </p>
+        </div>
 
-          <AnimatePresence>
-            {showDetails && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Itens nesta loja</h4>
-                  {singleMarket.items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center py-1">
-                      <span className="text-sm text-slate-600">{item.name}</span>
-                      <span className="text-sm font-bold text-slate-900">{formatCurrency(item.price)}</span>
+        <div className="space-y-3">
+          {singleMarketRanking.map((market, idx) => (
+            <Card 
+              key={market.id} 
+              className={`p-5 transition-all cursor-pointer ${idx === 0 ? 'ring-2 ring-primary ring-offset-2' : ''}`} 
+              hoverable
+              onClick={() => setExpandedSingleMarket(expandedSingleMarket === market.id ? null : market.id)}
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex space-x-3">
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
+                    idx === 0 ? 'bg-primary/10 text-primary' : 
+                    idx === 1 ? 'bg-slate-100 text-slate-500' : 
+                    'bg-orange-50 text-orange-500'
+                  }`}>
+                    {idx === 0 ? <Medal size={20} /> : <span className="font-bold">{idx + 1}º</span>}
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h3 className="font-bold text-slate-900">{market.name}</h3>
+                      {idx === 0 && <CheckCircle2 size={14} className="text-primary" />}
                     </div>
-                  ))}
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                      {idx === 0 ? 'Melhor preço único' : `${idx + 1}ª melhor opção`}
+                    </p>
+                  </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-slate-900">{formatCurrency(market.total)}</p>
+                  <p className="text-[10px] text-green-600 font-bold">Economia: {formatCurrency(market.savings)}</p>
+                </div>
+              </div>
+              
+              <div className="mt-4">
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-primary h-full" style={{ width: `${market.score}%` }} />
+                </div>
+                <div className="flex justify-between mt-1.5">
+                  <span className="text-[9px] text-slate-400 font-bold uppercase">Disponibilidade</span>
+                  <span className="text-[9px] text-primary font-bold">{market.score}% dos itens</span>
+                </div>
+              </div>
 
-          <Button 
-            variant="outline" 
-            className="w-full mt-6"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowDetails(!showDetails);
-            }}
-          >
-            {showDetails ? 'Ocultar detalhes' : 'Ver detalhes'}
-          </Button>
-        </Card>
+              <AnimatePresence>
+                {expandedSingleMarket === market.id && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-5 pt-5 border-t border-slate-100 space-y-2">
+                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lista de preços</h4>
+                      {market.items.map((item, i) => (
+                        <div key={i} className="flex justify-between items-center py-0.5">
+                          <span className="text-xs text-slate-600">{item.name}</span>
+                          <span className="text-xs font-bold text-slate-900">{formatCurrency(item.price)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="mt-4 flex justify-center">
+                <button className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center">
+                  {expandedSingleMarket === market.id ? 'Ocultar detalhes' : 'Ver detalhes'}
+                  {expandedSingleMarket === market.id ? <ChevronUp size={12} className="ml-1" /> : <ChevronDown size={12} className="ml-1" />}
+                </button>
+              </div>
+            </Card>
+          ))}
+        </div>
       </section>
     </div>
   );

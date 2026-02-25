@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
 import { 
   Plus, 
   Upload, 
@@ -92,6 +93,16 @@ const PRODUCT_IMAGES: Record<string, string[]> = {
   'maionese': ['🧴', 'https://images.unsplash.com/photo-1563636619-e9107da5a1bb?w=400&h=400&fit=crop'],
   'ketchup': ['🍅', 'https://images.unsplash.com/photo-1518977822534-7049a61ee0c2?w=400&h=400&fit=crop'],
   'mostarda': ['🌭', 'https://images.unsplash.com/photo-1518977822534-7049a61ee0c2?w=400&h=400&fit=crop'],
+  'leite condensado': ['🥛', 'https://images.unsplash.com/photo-1563636619-e9107da5a1bb?w=400&h=400&fit=crop'],
+  'creme de leite': ['🥛', 'https://images.unsplash.com/photo-1563636619-e9107da5a1bb?w=400&h=400&fit=crop'],
+  'achocolatado': ['🍫', 'https://images.unsplash.com/photo-1511381939415-e44015466834?w=400&h=400&fit=crop'],
+  'fermento': ['🍞', 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=400&fit=crop'],
+  'gelatina': ['🍧', 'https://images.unsplash.com/photo-1501443762994-82bd5dabb892?w=400&h=400&fit=crop'],
+  'tempero': ['🧂', 'https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=400&h=400&fit=crop'],
+  'vinagre': ['🧴', 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&h=400&fit=crop'],
+  'azeitona': ['🫒', 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&h=400&fit=crop'],
+  'palmito': ['🎋', 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=400&fit=crop'],
+  'cogumelo': ['🍄', 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=400&fit=crop'],
 };
 
 const getSuggestedImage = (name: string): string => {
@@ -202,32 +213,25 @@ export const MarketPanel = () => {
   };
 
   const parsePrice = (value: any): number => {
-    if (value === null || value === undefined) return 0;
     if (typeof value === 'number') return value;
+    if (value === null || value === undefined) return 0;
     
     let str = value.toString().trim();
     if (!str) return 0;
 
-    // Remove currency symbols, spaces and other non-numeric chars except , and .
+    // Remove currency symbols and spaces
     str = str.replace(/[R$\s]/g, '');
     
-    // If it's something like "4,99", convert to "4.99"
-    // If it's "1.250,50", convert to "1250.50"
-    if (str.includes(',') && str.includes('.')) {
-      // Has both, assume . is thousand and , is decimal
+    // Brazilian format check: 1.234,56
+    // If it has both, we assume . is thousand and , is decimal
+    if (str.includes('.') && str.includes(',')) {
       str = str.replace(/\./g, '').replace(',', '.');
-    } else if (str.includes(',')) {
-      // Only has comma, assume it's decimal
+    } 
+    // Simple decimal comma: 4,99
+    else if (str.includes(',') && !str.includes('.')) {
       str = str.replace(',', '.');
     }
-    
-    // Final cleanup: remove any remaining non-numeric chars except the first dot
-    const firstDotIndex = str.indexOf('.');
-    if (firstDotIndex !== -1) {
-      const before = str.substring(0, firstDotIndex + 1);
-      const after = str.substring(firstDotIndex + 1).replace(/\./g, '');
-      str = before + after;
-    }
+    // If it only has a dot, we assume it's already a decimal point (e.g., 4.99)
     
     const parsed = parseFloat(str);
     return isNaN(parsed) ? 0 : parsed;
@@ -238,90 +242,44 @@ export const MarketPanel = () => {
     if (!file) return;
 
     try {
-      const workbook = new ExcelJS.Workbook();
       const arrayBuffer = await file.arrayBuffer();
+      // Read as array to better handle encoding and binary data
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       
-      let newProducts: MarketProduct[] = [];
+      // raw: true ensures we get the original values without XLSX's locale-based number parsing
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true });
+      
+      const imported: MarketProduct[] = [];
+      jsonData.slice(1).forEach((row: any) => {
+        const name = row[0]?.toString().trim();
+        const brand = row[1]?.toString().trim();
+        const priceVal = row[2];
+        const category = row[3]?.toString().trim();
 
-      if (file.name.endsWith('.csv')) {
-        const text = new TextDecoder().decode(arrayBuffer);
-        const lines = text.split(/\r?\n/);
-        lines.slice(1).forEach(line => {
-          if (!line.trim()) return;
-          
-          // Smarter separator detection
-          let parts: string[] = [];
-          if (line.includes(';')) {
-            parts = line.split(';');
-          } else {
-            // Try to handle comma separator with comma decimal
-            // Example: "Arroz,Tio Joao,22,90,Graos" -> 5 parts
-            const commaParts = line.split(',');
-            if (commaParts.length === 5) {
-              parts = [
-                commaParts[0], 
-                commaParts[1], 
-                `${commaParts[2]}.${commaParts[3]}`, 
-                commaParts[4]
-              ];
-            } else {
-              parts = commaParts;
-            }
-          }
-          
-          const name = parts[0]?.trim();
-          const brand = parts[1]?.trim();
-          const priceStr = parts[2]?.trim();
-          const category = parts[3]?.trim();
-
-          if (name && priceStr) {
-            const price = parsePrice(priceStr);
-            newProducts.push({
-              id: Math.random().toString(36).substr(2, 9),
-              name,
-              brand: brand || '',
-              price,
-              category: category || 'Geral',
-              imageUrl: getSuggestedImage(name)
-            });
-          }
-        });
-      } else {
-        await workbook.xlsx.load(arrayBuffer);
-        const worksheet = workbook.getWorksheet(1);
-        if (worksheet) {
-          worksheet.eachRow((row, rowNumber) => {
-            if (rowNumber === 1) return; // Skip header
-            const name = row.getCell(1).value?.toString();
-            const brand = row.getCell(2).value?.toString();
-            const priceStr = row.getCell(3).value?.toString();
-            const category = row.getCell(4).value?.toString();
-
-            if (name && priceStr) {
-              newProducts.push({
-                id: Math.random().toString(36).substr(2, 9),
-                name: name.trim(),
-                brand: brand?.trim() || '',
-                price: parsePrice(priceStr),
-                category: category?.trim() || 'Geral',
-                imageUrl: getSuggestedImage(name.trim())
-              });
-            }
+        if (name && (priceVal !== null && priceVal !== undefined)) {
+          imported.push({
+            id: Math.random().toString(36).substr(2, 9),
+            name,
+            brand: brand || '',
+            price: parsePrice(priceVal),
+            category: category || 'Geral',
+            imageUrl: getSuggestedImage(name)
           });
         }
-      }
+      });
 
-      if (newProducts.length > 0) {
-        setProducts([...newProducts, ...products]);
-        showNotification('success', `${newProducts.length} produtos importados com sucesso!`);
+      if (imported.length > 0) {
+        setProducts(prev => [...imported, ...prev]);
+        showNotification('success', `${imported.length} produtos importados!`);
       } else {
         showNotification('error', 'Nenhum produto válido encontrado no arquivo.');
       }
     } catch (error) {
       console.error('Erro ao processar arquivo:', error);
-      showNotification('error', 'Erro ao processar o arquivo. Verifique o formato.');
+      showNotification('error', 'Erro ao processar o arquivo. Verifique o formato e a codificação (UTF-8).');
     } finally {
-      if (e.target) e.target.value = '';
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -429,7 +387,6 @@ export const MarketPanel = () => {
                       setEditingId(product.id);
                       setFormData(product);
                       setIsAdding(true);
-                      setIsImageGalleryOpen(true);
                     }}
                   >
                     {product.imageUrl ? (
@@ -608,10 +565,15 @@ export const MarketPanel = () => {
                     />
                     <Input 
                       label="Preço (R$)" 
-                      type="number" 
-                      placeholder="0.00" 
-                      value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+                      placeholder="0,00" 
+                      value={formData.price !== undefined ? formData.price.toString().replace('.', ',') : ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        // Allow typing commas and dots
+                        if (val === '' || /^[0-9R$\s,.]*$/.test(val)) {
+                          setFormData({ ...formData, price: parsePrice(val) });
+                        }
+                      }}
                     />
                   </div>
                   <Input 
@@ -665,6 +627,8 @@ export const MarketPanel = () => {
                     onClick={() => {
                       setFormData(prev => ({ ...prev, imageUrl: img[1] }));
                       setIsImageGalleryOpen(false);
+                      // If we were editing from the list, make sure the modal is open
+                      setIsAdding(true);
                     }}
                     className={`aspect-square rounded-2xl overflow-hidden border-2 transition-all hover:scale-105 active:scale-95 flex flex-col items-center justify-center p-1 bg-slate-50 ${
                       formData.imageUrl === img[1] ? 'border-primary ring-2 ring-primary/20' : 'border-slate-100'

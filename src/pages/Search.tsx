@@ -1,38 +1,59 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Search, Filter, SlidersHorizontal, TrendingUp, TrendingDown, Clock, MapPin, Zap } from 'lucide-react';
 import { Card } from '@/src/components/ui/Card';
 import { Input } from '@/src/components/ui/Input';
 import { Button } from '@/src/components/ui/Button';
 import { formatCurrency } from '@/src/lib/utils';
 import { motion } from 'motion/react';
-
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import { X, UserCheck, Camera } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { normalizeString } from '@/src/lib/searchUtils';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
+import { PRODUCTS, PRICES } from '../data/mockData';
+
+interface ProductItem {
+  id: string;
+  name: string;
+  brand: string;
+  price: number;
+  market: string;
+  proof: boolean;
+  proofUrl?: string;
+  time: string;
+  distance: string;
+  icon: string;
+  flashSale: { endsIn: string } | null;
+  tags: string[];
+}
 
 export const SearchPage = () => {
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get('q') || '');
   const [selectedProof, setSelectedProof] = useState<string | null>(null);
   
-  const allProducts = [
-    { id: '1', name: 'Leite Integral 1L', brand: 'Parmalat', price: 4.50, market: 'Mercado A', proof: true, proofUrl: 'https://picsum.photos/seed/leite/600/800', time: '1h atrás', distance: '0.8km', icon: '🥛', flashSale: { endsIn: '02:45:12' }, tags: ['leite', 'laticinio', 'bebida'] },
-    { id: '2', name: 'Leite Integral 1L', brand: 'Itambé', price: 4.79, market: 'Mercado B', proof: false, time: '3h atrás', distance: '1.2km', icon: '🥛', tags: ['leite', 'laticinio', 'bebida'] },
-    { id: '3', name: 'Leite Integral 1L', brand: 'Piracanjuba', price: 5.10, market: 'Mercado C', proof: false, time: '12h atrás', distance: '2.5km', icon: '🥛', tags: ['leite', 'laticinio', 'bebida'] },
-    { id: '4', name: 'Feijão Carioca 1kg', brand: 'Kicaldo', price: 8.90, market: 'Mercado A', proof: true, proofUrl: 'https://picsum.photos/seed/feijao1/600/800', time: '2h atrás', distance: '0.8km', icon: '🥘', flashSale: { endsIn: '00:15:45' }, tags: ['feijao', 'grao', 'alimento'] },
-    { id: '5', name: 'Feijão Preto 1kg', brand: 'Camil', price: 7.50, market: 'Mercado B', proof: true, proofUrl: 'https://picsum.photos/seed/feijao2/600/800', time: '30min atrás', distance: '1.2km', icon: '🥘', tags: ['feijao', 'grao', 'alimento'] },
-    { id: '6', name: 'Arroz Branco 5kg', brand: 'Tio João', price: 22.90, market: 'Mercado X', proof: true, proofUrl: 'https://picsum.photos/seed/arroz/600/800', time: '5h atrás', distance: '3.0km', icon: '🍚', tags: ['arroz', 'grao', 'alimento'] },
-    { id: '7', name: 'Café Torrado 500g', brand: 'Pilão', price: 15.50, market: 'Mercado Z', proof: false, time: '1h atrás', distance: '1.5km', icon: '☕', tags: ['cafe', 'bebida', 'matinal'] },
-    { id: '8', name: 'Alcatra Bovina kg', brand: 'Friboi', price: 38.90, market: 'Mercado A', proof: true, proofUrl: 'https://picsum.photos/seed/carne1/600/800', time: '45min atrás', distance: '0.8km', icon: '🥩', tags: ['carne', 'bovino', 'churrasco', 'proteina'] },
-    { id: '9', name: 'Peito de Frango 1kg', brand: 'Seara', price: 18.50, market: 'Mercado B', proof: false, time: '2h atrás', distance: '1.2km', icon: '🍗', tags: ['carne', 'frango', 'ave', 'proteina'] },
-    { id: '10', name: 'Contra Filé kg', brand: 'Swift', price: 42.00, market: 'Mercado C', proof: true, proofUrl: 'https://picsum.photos/seed/carne2/600/800', time: '1h atrás', distance: '2.5km', icon: '🥩', tags: ['carne', 'bovino', 'churrasco', 'proteina'] },
-    { id: '11', name: 'Biscoito Trakinas 126g', brand: 'Mondelēz', price: 3.20, market: 'Mercado B', proof: true, proofUrl: 'https://picsum.photos/seed/trakinas/600/800', time: '10min atrás', distance: '1.2km', icon: '🍪', tags: ['biscoito', 'bolacha', 'doce', 'recheado', 'lanche'] },
-    { id: '12', name: 'Bolacha Passatempo 130g', brand: 'Nestlé', price: 3.50, market: 'Mercado A', proof: false, time: '4h atrás', distance: '0.8km', icon: '🍪', tags: ['biscoito', 'bolacha', 'doce', 'recheado', 'lanche'] },
-    { id: '13', name: 'Macarrão Espaguete 500g', brand: 'Adria', price: 5.90, market: 'Mercado C', proof: true, proofUrl: 'https://picsum.photos/seed/massa/600/800', time: '1h atrás', distance: '2.5km', icon: '🍝', tags: ['massa', 'macarrao', 'pasta', 'alimento'] },
-  ];
+  const allProducts = useMemo<ProductItem[]>(() => {
+    return PRICES.map((price, idx) => {
+      const pIdx = Math.floor(idx / 3);
+      const prod = PRODUCTS[pIdx];
+      
+      return {
+        id: `${prod.id}-${price.marketId}`,
+        name: prod.name,
+        brand: prod.brand,
+        price: price.price,
+        market: price.marketName,
+        proof: !!price.hasProof,
+        proofUrl: `https://picsum.photos/seed/${prod.id}/600/800`,
+        time: '1h atrás',
+        distance: '0.8km',
+        icon: '🛒',
+        flashSale: Math.random() > 0.8 ? { endsIn: '02:45:12' } : null,
+        tags: [prod.category.toLowerCase(), prod.brand.toLowerCase()]
+      };
+    });
+  }, []);
 
   // Mock aggregated history data (Optimized Rollups)
   const mockHistoryData: Record<string, { date: string; price: number }[]> = {
@@ -54,7 +75,7 @@ export const SearchPage = () => {
     ]
   };
 
-  const fuse = new Fuse(allProducts, {
+  const fuse = useMemo(() => new Fuse<ProductItem>(allProducts, {
     keys: [
       { name: 'name', weight: 0.6 },
       { name: 'tags', weight: 0.3 },
@@ -70,25 +91,23 @@ export const SearchPage = () => {
       const value = (obj as any)[path as string];
       return typeof value === 'string' ? normalizeString(value) : value;
     }
-  });
+  }), [allProducts]);
 
-  const results = search 
-    ? fuse.search(normalizeString(search))
-        .filter(r => {
-          // Additional filter: if the match is in the name, it should ideally 
-          // start at a word boundary or be a very high quality match.
-          // This prevents "pasta" matching "Passatempo" just because it's a substring.
-          if (r.score && r.score > 0.1) {
-            const name = normalizeString(r.item.name);
-            const query = normalizeString(search);
-            const isAtWordBoundary = name.split(/\s+/).some(word => word.startsWith(query));
-            const isTagMatch = r.item.tags?.some(tag => normalizeString(tag) === query);
-            return isAtWordBoundary || isTagMatch;
-          }
-          return true;
-        })
-        .map(r => r.item)
-    : [];
+  const results = useMemo(() => {
+    if (!search) return [];
+    return fuse.search(normalizeString(search))
+      .filter(r => {
+        if (r.score && r.score > 0.1) {
+          const name = normalizeString(r.item.name);
+          const query = normalizeString(search);
+          const isAtWordBoundary = name.split(/\s+/).some(word => word.startsWith(query));
+          const isTagMatch = r.item.tags?.some(tag => normalizeString(tag) === query);
+          return isAtWordBoundary || isTagMatch;
+        }
+        return true;
+      })
+      .map(r => r.item);
+  }, [search, fuse]);
 
   return (
     <div className="pb-24 pt-6 px-4 space-y-6 max-w-lg mx-auto">

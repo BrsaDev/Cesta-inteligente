@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Trash2, Calculator, Search, X } from 'lucide-react';
 import { Card } from '@/src/components/ui/Card';
 import { Button } from '@/src/components/ui/Button';
@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/src/lib/supabase';
 import Fuse from 'fuse.js';
 import { normalizeString } from '@/src/lib/searchUtils';
+import { PRODUCTS } from '../data/mockData';
 
 export const CreateList = () => {
   const navigate = useNavigate();
@@ -16,11 +17,9 @@ export const CreateList = () => {
   const [search, setSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const suggestions = [
-    'Arroz 5kg', 'Leite Integral', 'Café 500g', 'Feijão Preto', 'Açúcar 1kg', 'Óleo de Soja'
-  ];
+  const suggestions = useMemo(() => PRODUCTS.map(p => p.name), []);
 
-  const fuse = new Fuse(suggestions.map(s => ({ name: s })), {
+  const fuse = useMemo(() => new Fuse(suggestions.map(s => ({ name: s })), {
     keys: ['name'],
     threshold: 0.2,
     distance: 100,
@@ -31,7 +30,7 @@ export const CreateList = () => {
       const value = (obj as any)[path as string];
       return typeof value === 'string' ? normalizeString(value) : value;
     }
-  });
+  }), [suggestions]);
 
   const filteredSuggestions = search 
     ? fuse.search(normalizeString(search))
