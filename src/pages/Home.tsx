@@ -12,8 +12,9 @@ export const Home = () => {
   const navigate = useNavigate();
   const [userName] = useState('Bruno');
   const [location] = useState('Cabo Frio, RJ');
-  const [offers, setOffers] = useState<any[]>([]);
+  const [groupedOffers, setGroupedOffers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [comparisonCount] = useState(3); // Default for home
 
   useEffect(() => {
     const fetchOffers = async () => {
@@ -27,25 +28,44 @@ export const Home = () => {
             has_proof,
             created_at,
             products (id, name, brand, category, image_url),
-            markets (name)
+            markets (id, name)
           `)
           .eq('is_active', true)
-          .order('price', { ascending: true })
-          .limit(5);
+          .order('price', { ascending: true });
 
         if (error) throw error;
 
         if (data) {
-          setOffers(data.map((item: any) => ({
-            id: item.id, // Use price ID for uniqueness
-            productId: item.products.id,
-            name: item.products.name,
-            price: item.price,
-            market: item.markets.name,
-            time: 'Recente',
-            type: 'promo',
-            flashSale: Math.random() > 0.8 ? { endsIn: '05:20:00' } : null
-          })));
+          // Group by product
+          const groups: Record<string, any> = {};
+          data.forEach((item: any) => {
+            const pId = item.products.id;
+            if (!groups[pId]) {
+              groups[pId] = {
+                productId: pId,
+                name: item.products.name,
+                brand: item.products.brand,
+                category: item.products.category,
+                imageUrl: item.products.image_url,
+                prices: []
+              };
+            }
+            groups[pId].prices.push({
+              id: item.id,
+              price: item.price,
+              market: item.markets.name,
+              marketId: item.markets.id,
+              hasProof: item.has_proof,
+              flashSale: Math.random() > 0.8 ? { endsIn: '05:20:00' } : null
+            });
+          });
+
+          // Take top 5 products with their comparisons
+          const sortedGroups = Object.values(groups)
+            .sort((a: any, b: any) => a.prices[0].price - b.prices[0].price)
+            .slice(0, 5);
+          
+          setGroupedOffers(sortedGroups);
         }
       } catch (error) {
         console.error('Error fetching offers:', error);
@@ -127,41 +147,71 @@ export const Home = () => {
             Ver todas
           </Button>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-6">
           {isLoading ? (
             <div className="py-8 text-center text-slate-400 text-sm">Carregando ofertas...</div>
-          ) : offers.length > 0 ? (
-            offers.map((offer, idx) => (
-              <motion.div
-                key={offer.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.1 }}
-              >
-                <Card className="flex items-center justify-between p-4" hoverable>
-                  <div className="flex items-center space-x-4">
-                    <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
-                      🛒
+          ) : groupedOffers.length > 0 ? (
+            groupedOffers.map((group, idx) => {
+              const bestPrice = group.prices[0];
+              const comparisons = group.prices.slice(1, comparisonCount);
+
+              return (
+                <motion.div
+                  key={group.productId}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                  className="space-y-2"
+                >
+                  <Card className="flex items-center justify-between p-4 bg-white border-none shadow-sm relative overflow-hidden" hoverable>
+                    <div className="flex items-center space-x-4 relative z-10">
+                      <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 shrink-0">
+                        {group.imageUrl ? (
+                          <img src={group.imageUrl} alt={group.name} className="w-full h-full object-cover rounded-2xl" referrerPolicy="no-referrer" />
+                        ) : '🛒'}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 truncate">{group.name}</p>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{bestPrice.market} • Recente</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-bold text-slate-900">{offer.name}</p>
-                      <p className="text-xs text-slate-500">{offer.market} • {offer.time}</p>
+                    <div className="text-right flex flex-col items-end space-y-1 relative z-10 shrink-0">
+                      <p className="font-bold text-primary">{formatCurrency(bestPrice.price)}</p>
+                      {bestPrice.flashSale ? (
+                        <span className="text-[9px] bg-red-500 text-white px-2 py-0.5 rounded-full font-bold uppercase animate-pulse flex items-center">
+                          <Zap size={8} className="mr-1 fill-current" />
+                          {bestPrice.flashSale.endsIn}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] bg-green-100 text-green-600 px-2 py-0.5 rounded-full font-bold uppercase">Melhor Preço</span>
+                      )}
                     </div>
-                  </div>
-                  <div className="text-right flex flex-col items-end space-y-1">
-                    <p className="font-bold text-primary">{formatCurrency(offer.price)}</p>
-                    {offer.flashSale ? (
-                      <span className="text-[9px] bg-red-500 text-white px-2 py-0.5 rounded-full font-bold uppercase animate-pulse flex items-center">
-                        <Zap size={8} className="mr-1 fill-current" />
-                        {offer.flashSale.endsIn}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] bg-green-100 text-green-600 px-2 py-0.5 rounded-full font-bold uppercase">Promoção</span>
-                    )}
-                  </div>
-                </Card>
-              </motion.div>
-            ))
+                    <div className="absolute -right-4 -bottom-4 h-20 w-20 bg-primary/5 rounded-full blur-2xl" />
+                  </Card>
+
+                  {/* Comparison rows */}
+                  {comparisons.length > 0 && (
+                    <div className="ml-4 space-y-1">
+                      {comparisons.map((comp: any, cIdx: number) => (
+                        <div 
+                          key={comp.id} 
+                          className={`flex items-center justify-between p-2.5 rounded-xl border border-slate-100 text-xs ${cIdx % 2 === 0 ? 'bg-slate-50/50' : 'bg-white'}`}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <span className="text-[10px] font-bold text-slate-400">{cIdx + 2}º</span>
+                            <span className="font-semibold text-slate-600">{comp.market}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-[9px] font-bold text-slate-400">+{formatCurrency(comp.price - bestPrice.price)}</span>
+                            <span className="font-bold text-slate-700">{formatCurrency(comp.price)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })
           ) : (
             <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
               <p className="text-slate-400 text-sm">Nenhuma oferta encontrada.</p>

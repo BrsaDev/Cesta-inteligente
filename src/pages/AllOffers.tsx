@@ -10,7 +10,7 @@ import { supabase } from '@/src/lib/supabase';
 
 export const AllOffers = () => {
   const navigate = useNavigate();
-  const [offers, setOffers] = useState<any[]>([]);
+  const [groupedOffers, setGroupedOffers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   
@@ -19,7 +19,7 @@ export const AllOffers = () => {
   const [selectedMarkets, setSelectedMarkets] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [onlyVerified, setOnlyVerified] = useState(false);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
+  const [comparisonCount, setComparisonCount] = useState(3);
 
   // Metadata for filters
   const [availableMarkets, setAvailableMarkets] = useState<any[]>([]);
@@ -31,7 +31,7 @@ export const AllOffers = () => {
 
   useEffect(() => {
     fetchOffers();
-  }, [selectedMarkets, selectedCategories, onlyVerified, search]);
+  }, [selectedMarkets, selectedCategories, onlyVerified, search, comparisonCount]);
 
   const fetchInitialData = async () => {
     const { data: markets } = await supabase.from('markets').select('id, name');
@@ -80,18 +80,33 @@ export const AllOffers = () => {
       if (error) throw error;
 
       if (data) {
-        setOffers(data.map((item: any) => ({
-          id: item.id,
-          name: item.products.name,
-          brand: item.products.brand,
-          price: item.price,
-          market: item.markets.name,
-          marketId: item.markets.id,
-          category: item.products.category,
-          hasProof: item.has_proof,
-          time: 'Recente',
-          flashSale: Math.random() > 0.9 ? { endsIn: '02:15:00' } : null
-        })));
+        // Group by product
+        const groups: Record<string, any> = {};
+        data.forEach((item: any) => {
+          const pId = item.products.id;
+          if (!groups[pId]) {
+            groups[pId] = {
+              productId: pId,
+              name: item.products.name,
+              brand: item.products.brand,
+              category: item.products.category,
+              imageUrl: item.products.image_url,
+              prices: []
+            };
+          }
+          groups[pId].prices.push({
+            id: item.id,
+            price: item.price,
+            market: item.markets.name,
+            marketId: item.markets.id,
+            hasProof: item.has_proof,
+            flashSale: Math.random() > 0.9 ? { endsIn: '02:15:00' } : null
+          });
+        });
+
+        // Convert to array and sort by best price
+        const sortedGroups = Object.values(groups).sort((a: any, b: any) => a.prices[0].price - b.prices[0].price);
+        setGroupedOffers(sortedGroups);
       }
     } catch (error) {
       console.error('Error fetching offers:', error);
@@ -101,9 +116,16 @@ export const AllOffers = () => {
   };
 
   const toggleMarket = (id: string) => {
-    setSelectedMarkets(prev => 
-      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
-    );
+    setSelectedMarkets(prev => {
+      const next = prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id];
+      // Sync comparison count with number of selected markets if any are selected
+      if (next.length > 0) {
+        setComparisonCount(next.length);
+      } else {
+        setComparisonCount(3); // Reset to default if none selected
+      }
+      return next;
+    });
   };
 
   const toggleCategory = (cat: string) => {
@@ -117,9 +139,10 @@ export const AllOffers = () => {
     setSelectedCategories([]);
     setOnlyVerified(false);
     setSearch('');
+    setComparisonCount(3);
   };
 
-  const activeFilterCount = selectedMarkets.length + selectedCategories.length + (onlyVerified ? 1 : 0);
+  const activeFilterCount = selectedMarkets.length + selectedCategories.length + (onlyVerified ? 1 : 0) + (comparisonCount !== 3 ? 1 : 0);
 
   return (
     <div className="pb-24 pt-6 px-4 space-y-6 max-w-lg mx-auto min-h-screen bg-slate-50">
@@ -155,7 +178,7 @@ export const AllOffers = () => {
         />
 
         {/* Active Tags Display */}
-        {(selectedMarkets.length > 0 || selectedCategories.length > 0) && (
+        {(selectedMarkets.length > 0 || selectedCategories.length > 0 || comparisonCount !== 3) && (
           <div className="flex flex-wrap gap-2">
             {selectedMarkets.map(id => {
               const market = availableMarkets.find(m => m.id === id);
@@ -176,6 +199,14 @@ export const AllOffers = () => {
                 </button>
               </span>
             ))}
+            {comparisonCount !== 3 && (
+              <span className="inline-flex items-center px-2 py-1 rounded-lg bg-orange-100 text-orange-600 text-[10px] font-bold uppercase">
+                {comparisonCount} Mercados
+                <button onClick={() => setComparisonCount(3)} className="ml-1 hover:text-orange-400">
+                  <X size={10} />
+                </button>
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -236,6 +267,24 @@ export const AllOffers = () => {
                 </div>
               </div>
 
+              <div className="space-y-3">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                  <Zap size={12} className="mr-1" /> Comparação de Mercados
+                </p>
+                <div className="flex items-center space-x-4">
+                  <input 
+                    type="range" 
+                    min="1" 
+                    max="5" 
+                    value={comparisonCount} 
+                    onChange={(e) => setComparisonCount(parseInt(e.target.value))}
+                    className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                  />
+                  <span className="text-sm font-bold text-primary w-8">{comparisonCount}</span>
+                </div>
+                <p className="text-[10px] text-slate-400">Mostrar até {comparisonCount} mercados por produto para comparação.</p>
+              </div>
+
               <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl">
                 <div className="flex items-center space-x-3">
                   <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-all ${onlyVerified ? 'bg-primary border-primary' : 'border-slate-300'}`}
@@ -254,59 +303,104 @@ export const AllOffers = () => {
         )}
       </AnimatePresence>
 
-      <section className="space-y-3">
+      <section className="space-y-6">
         <div className="flex justify-between items-center px-1">
           <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Resultados</h2>
-          <span className="text-[10px] font-bold text-slate-400">{offers.length} ofertas encontradas</span>
+          <span className="text-[10px] font-bold text-slate-400">{groupedOffers.length} produtos encontrados</span>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-8">
           {isLoading ? (
             <div className="py-20 text-center">
               <div className="h-10 w-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
               <p className="text-slate-400 text-sm font-medium">Buscando as melhores ofertas...</p>
             </div>
-          ) : offers.length > 0 ? (
-            offers.map((offer, idx) => (
-              <motion.div
-                key={offer.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-              >
-                <Card className="flex items-center justify-between p-4 bg-white border-none shadow-sm" hoverable>
-                  <div className="flex items-center space-x-4">
-                    <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 relative">
-                      🛒
-                      {offer.hasProof && (
-                        <div className="absolute -top-1 -right-1 h-4 w-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
-                          <Check size={8} className="text-white" />
+          ) : groupedOffers.length > 0 ? (
+            groupedOffers.map((group, idx) => {
+              const bestPrice = group.prices[0];
+              const comparisons = group.prices.slice(1, comparisonCount);
+
+              return (
+                <motion.div
+                  key={group.productId}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="space-y-2"
+                >
+                  {/* Main Product Card (Best Price) */}
+                  <Card className="p-4 bg-white border-none shadow-sm relative overflow-hidden" hoverable>
+                    <div className="flex items-center justify-between relative z-10">
+                      <div className="flex items-center space-x-4">
+                        <div className="h-14 w-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 relative shrink-0">
+                          {group.imageUrl ? (
+                            <img src={group.imageUrl} alt={group.name} className="w-full h-full object-cover rounded-2xl" referrerPolicy="no-referrer" />
+                          ) : '🛒'}
+                          {bestPrice.hasProof && (
+                            <div className="absolute -top-1 -right-1 h-4 w-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                              <Check size={8} className="text-white" />
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-900">{offer.name}</p>
-                      <div className="flex items-center space-x-2 mt-0.5">
-                        <span className="text-[10px] font-bold text-primary uppercase">{offer.market}</span>
-                        <span className="text-slate-300">•</span>
-                        <span className="text-[10px] text-slate-400 font-medium">{offer.category}</span>
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 truncate">{group.name}</p>
+                          <div className="flex items-center space-x-2 mt-0.5">
+                            <span className="text-[10px] font-bold text-primary uppercase truncate">{bestPrice.market}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="text-[10px] text-slate-400 font-medium">{group.category}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right flex flex-col items-end space-y-1 shrink-0">
+                        <p className="font-bold text-primary text-xl">{formatCurrency(bestPrice.price)}</p>
+                        {bestPrice.flashSale ? (
+                          <span className="text-[9px] bg-red-500 text-white px-2 py-0.5 rounded-full font-bold uppercase animate-pulse flex items-center">
+                            <Zap size={8} className="mr-1 fill-current" />
+                            {bestPrice.flashSale.endsIn}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full font-bold uppercase">Melhor Preço</span>
+                        )}
                       </div>
                     </div>
-                  </div>
-                  <div className="text-right flex flex-col items-end space-y-1">
-                    <p className="font-bold text-primary text-lg">{formatCurrency(offer.price)}</p>
-                    {offer.flashSale ? (
-                      <span className="text-[9px] bg-red-500 text-white px-2 py-0.5 rounded-full font-bold uppercase animate-pulse flex items-center">
-                        <Zap size={8} className="mr-1 fill-current" />
-                        {offer.flashSale.endsIn}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full font-bold uppercase">Promoção</span>
-                    )}
-                  </div>
-                </Card>
-              </motion.div>
-            ))
+                    {/* Subtle background decoration for the "winner" */}
+                    <div className="absolute -right-4 -bottom-4 h-24 w-24 bg-primary/5 rounded-full blur-2xl" />
+                  </Card>
+
+                  {/* Comparison List */}
+                  {comparisons.length > 0 && (
+                    <div className="ml-4 space-y-1">
+                      {comparisons.map((comp: any, cIdx: number) => {
+                        const diff = comp.price - bestPrice.price;
+                        // Alternate subtle backgrounds for visual distinction
+                        const bgClass = cIdx % 2 === 0 ? 'bg-slate-50' : 'bg-white';
+                        
+                        return (
+                          <motion.div
+                            key={comp.id}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: (idx * 0.05) + (cIdx * 0.05) }}
+                            className={`flex items-center justify-between p-3 rounded-xl border border-slate-100 ${bgClass}`}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="h-6 w-6 rounded-lg bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                                {cIdx + 2}º
+                              </div>
+                              <span className="text-xs font-semibold text-slate-600">{comp.market}</span>
+                            </div>
+                            <div className="flex items-center space-x-3">
+                              <span className="text-[10px] font-bold text-slate-400">+{formatCurrency(diff)}</span>
+                              <span className="text-sm font-bold text-slate-700">{formatCurrency(comp.price)}</span>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })
           ) : (
             <div className="py-20 text-center bg-white rounded-3xl border border-dashed border-slate-200">
               <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
