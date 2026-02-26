@@ -10,11 +10,13 @@ import { Profile } from './pages/Profile';
 import { MarketPanel } from './pages/MarketPanel';
 import { EconomyDetails } from './pages/EconomyDetails';
 import { BottomNav } from './components/layout/BottomNav';
+import { ScrollToTop } from './components/utils/ScrollToTop';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   return (
     <Router>
+      <ScrollToTop />
       <div className="min-h-screen bg-background pb-20">
         <AnimatePresence mode="wait">
           <Routes>
@@ -22,6 +24,7 @@ export default function App() {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/lists" element={<MyLists />} />
             <Route path="/lists/new" element={<CreateList />} />
+            <Route path="/lists/edit/:id" element={<CreateList />} />
             <Route path="/contribute" element={<Contribute />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/results" element={<Results />} />

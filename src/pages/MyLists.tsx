@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, ChevronRight, ShoppingBag, Calendar, Trash2 } from 'lucide-react';
+import { Plus, ChevronRight, ShoppingBag, Calendar, Trash2, Edit2 } from 'lucide-react';
 import { Card } from '@/src/components/ui/Card';
 import { Button } from '@/src/components/ui/Button';
 import { supabase, ShoppingList } from '@/src/lib/supabase';
@@ -38,6 +38,7 @@ export const MyLists = () => {
   };
 
   const deleteList = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta lista?')) return;
     try {
       const { error } = await supabase
         .from('shopping_lists')
@@ -98,7 +99,16 @@ export const MyLists = () => {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1">
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/lists/edit/${list.id}`);
+                    }}
+                    className="p-2 text-slate-300 hover:text-primary transition-colors"
+                  >
+                    <Edit2 size={18} />
+                  </button>
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();

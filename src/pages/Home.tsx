@@ -163,27 +163,27 @@ export const Home = () => {
                   transition={{ delay: idx * 0.1 }}
                   className="space-y-2"
                 >
-                  <Card className="flex items-center justify-between p-4 bg-white border-none shadow-sm relative overflow-hidden" hoverable>
-                    <div className="flex items-center space-x-4 relative z-10">
-                      <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 shrink-0">
+                  <Card className="flex items-center justify-between p-3 sm:p-4 bg-white border-none shadow-sm relative overflow-hidden" hoverable>
+                    <div className="flex items-center space-x-3 sm:space-x-4 relative z-10 min-w-0 flex-1">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl sm:rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 shrink-0">
                         {group.imageUrl ? (
-                          <img src={group.imageUrl} alt={group.name} className="w-full h-full object-cover rounded-2xl" referrerPolicy="no-referrer" />
+                          <img src={group.imageUrl} alt={group.name} className="w-full h-full object-cover rounded-xl sm:rounded-2xl" referrerPolicy="no-referrer" />
                         ) : '🛒'}
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-slate-900 truncate">{group.name}</p>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{bestPrice.market} • Recente</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-slate-900 text-sm sm:text-base truncate leading-tight">{group.name}</p>
+                        <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5 truncate">{bestPrice.market} • Recente</p>
                       </div>
                     </div>
-                    <div className="text-right flex flex-col items-end space-y-1 relative z-10 shrink-0">
-                      <p className="font-bold text-primary">{formatCurrency(bestPrice.price)}</p>
+                    <div className="text-right flex flex-col items-end space-y-1 relative z-10 shrink-0 ml-2">
+                      <p className="font-bold text-primary text-sm sm:text-lg leading-none">{formatCurrency(bestPrice.price)}</p>
                       {bestPrice.flashSale ? (
-                        <span className="text-[9px] bg-red-500 text-white px-2 py-0.5 rounded-full font-bold uppercase animate-pulse flex items-center">
+                        <span className="text-[8px] sm:text-[9px] bg-red-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-bold uppercase animate-pulse flex items-center">
                           <Zap size={8} className="mr-1 fill-current" />
                           {bestPrice.flashSale.endsIn}
                         </span>
                       ) : (
-                        <span className="text-[10px] bg-green-100 text-green-600 px-2 py-0.5 rounded-full font-bold uppercase">Melhor Preço</span>
+                        <span className="text-[8px] sm:text-[10px] bg-green-100 text-green-600 px-1.5 sm:px-2 py-0.5 rounded-full font-bold uppercase">Melhor Preço</span>
                       )}
                     </div>
                     <div className="absolute -right-4 -bottom-4 h-20 w-20 bg-primary/5 rounded-full blur-2xl" />

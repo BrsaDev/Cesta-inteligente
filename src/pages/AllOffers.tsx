@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Filter, X, Check, Store, Tag, Zap, Search } from 'lucide-react';
+import { ArrowLeft, Filter, X, Check, Store, Tag, Zap, Search, Camera } from 'lucide-react';
 import { Card } from '@/src/components/ui/Card';
 import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
@@ -10,6 +10,7 @@ import { supabase } from '@/src/lib/supabase';
 
 export const AllOffers = () => {
   const navigate = useNavigate();
+  const [selectedProof, setSelectedProof] = useState<string | null>(null);
   const [groupedOffers, setGroupedOffers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
@@ -53,9 +54,12 @@ export const AllOffers = () => {
           id,
           price,
           has_proof,
+          proof_url,
           created_at,
+          source_type,
           products!inner (id, name, brand, category, image_url),
-          markets (id, name)
+          markets (id, name),
+          profiles:created_by (name)
         `)
         .eq('is_active', true);
 
@@ -100,6 +104,9 @@ export const AllOffers = () => {
             market: item.markets.name,
             marketId: item.markets.id,
             hasProof: item.has_proof,
+            proofUrl: item.proof_url,
+            sourceType: item.source_type,
+            contributor: item.profiles?.name || (item.source_type === 'market' ? 'Mercado' : 'Usuário'),
             flashSale: Math.random() > 0.9 ? { endsIn: '02:15:00' } : null
           });
         });
@@ -331,8 +338,8 @@ export const AllOffers = () => {
                   {/* Main Product Card (Best Price) */}
                   <Card className="p-3 sm:p-4 bg-white border-none shadow-sm relative overflow-hidden" hoverable>
                     <div className="flex items-center justify-between relative z-10 gap-2">
-                      <div className="flex items-center space-x-3 sm:space-x-4 min-w-0">
-                        <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 relative shrink-0 overflow-hidden">
+                      <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                        <div className="h-10 w-10 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 relative shrink-0 overflow-hidden">
                           {group.imageUrl ? (
                             <img src={group.imageUrl} alt={group.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           ) : '🛒'}
@@ -342,24 +349,36 @@ export const AllOffers = () => {
                             </div>
                           )}
                         </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-900 text-sm sm:text-base truncate leading-tight">{group.name}</p>
-                          <div className="flex items-center space-x-2 mt-0.5">
-                            <span className="text-[9px] sm:text-[10px] font-bold text-primary uppercase truncate">{bestPrice.market}</span>
-                            <span className="text-slate-300">•</span>
-                            <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium truncate">{group.category}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-slate-900 text-xs sm:text-base truncate leading-tight">{group.name}</p>
+                          <div className="flex flex-col mt-0.5">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-[8px] sm:text-[10px] font-bold text-primary uppercase truncate">{bestPrice.market}</span>
+                              <span className="text-slate-300">•</span>
+                              <span className="text-[8px] sm:text-[10px] text-slate-400 font-medium truncate">{group.category}</span>
+                            </div>
+                            <span className="text-[7px] text-slate-300 font-bold uppercase truncate">Por: {bestPrice.contributor}</span>
                           </div>
+                          {bestPrice.hasProof && (
+                            <button 
+                              onClick={() => setSelectedProof(bestPrice.proofUrl || `https://picsum.photos/seed/${bestPrice.id}/800/1000`)}
+                              className="mt-1 inline-flex items-center text-[7px] sm:text-[9px] bg-green-100 text-green-600 px-1 sm:px-1.5 py-0.5 rounded-md font-bold uppercase hover:bg-green-200 transition-colors whitespace-nowrap"
+                            >
+                              <Camera size={10} className="mr-1" />
+                              <span className="hidden xs:inline">Verificado • </span>Foto
+                            </button>
+                          )}
                         </div>
                       </div>
-                      <div className="text-right flex flex-col items-end space-y-1 shrink-0">
-                        <p className="font-bold text-primary text-base sm:text-xl leading-none">{formatCurrency(bestPrice.price)}</p>
+                      <div className="text-right flex flex-col items-end space-y-1 shrink-0 ml-2">
+                        <p className="font-bold text-primary text-sm sm:text-xl leading-none">{formatCurrency(bestPrice.price)}</p>
                         {bestPrice.flashSale ? (
-                          <span className="text-[8px] sm:text-[9px] bg-red-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-bold uppercase animate-pulse flex items-center">
+                          <span className="text-[7px] sm:text-[9px] bg-red-500 text-white px-1 sm:px-2 py-0.5 rounded-full font-bold uppercase animate-pulse flex items-center">
                             <Zap size={8} className="mr-1 fill-current" />
                             {bestPrice.flashSale.endsIn}
                           </span>
                         ) : (
-                          <span className="text-[8px] sm:text-[10px] bg-green-50 text-green-600 px-1.5 sm:px-2 py-0.5 rounded-full font-bold uppercase">Melhor Preço</span>
+                          <span className="text-[7px] sm:text-[10px] bg-green-50 text-green-600 px-1 sm:px-2 py-0.5 rounded-full font-bold uppercase">Melhor Preço</span>
                         )}
                       </div>
                     </div>
@@ -413,6 +432,56 @@ export const AllOffers = () => {
           )}
         </div>
       </section>
+
+      {/* Proof Modal */}
+      <AnimatePresence>
+        {selectedProof && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/80 backdrop-blur-sm md:p-4"
+            onClick={() => setSelectedProof(null)}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="relative w-full md:max-w-sm bg-white rounded-t-[32px] md:rounded-[32px] overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 md:hidden shrink-0" />
+              <button 
+                onClick={() => setSelectedProof(null)}
+                className="absolute top-6 right-6 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full backdrop-blur-md transition-all z-10"
+              >
+                <X size={20} />
+              </button>
+              <div className="p-6 border-b border-slate-100">
+                <h3 className="font-bold text-slate-900 flex items-center">
+                  <Camera size={18} className="mr-2 text-primary" />
+                  Comprovante do Usuário
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">Foto tirada no estabelecimento</p>
+              </div>
+              <div className="aspect-[3/4] w-full bg-slate-100">
+                <img 
+                  src={selectedProof} 
+                  alt="Comprovante de preço" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div className="p-6 bg-slate-50 pb-20 sm:pb-6">
+                <Button className="w-full" onClick={() => setSelectedProof(null)}>
+                  Fechar
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

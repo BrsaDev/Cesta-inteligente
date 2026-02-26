@@ -77,8 +77,10 @@ export const SearchPage = () => {
             has_proof,
             proof_url,
             created_at,
+            source_type,
             products!inner (id, name, brand, category, image_url),
-            markets (id, name)
+            markets (id, name),
+            profiles:created_by (name)
           `)
           .ilike('products.name', `%${search}%`)
           .eq('is_active', true);
@@ -125,6 +127,8 @@ export const SearchPage = () => {
               marketId: item.markets.id,
               hasProof: item.has_proof,
               proofUrl: item.proof_url,
+              sourceType: item.source_type,
+              contributor: item.profiles?.name || (item.source_type === 'market' ? 'Mercado' : 'Usuário'),
               time: 'Recente',
               distance: '1.0km',
               flashSale: null
@@ -349,33 +353,38 @@ export const SearchPage = () => {
                   >
                     <Card className="p-3 sm:p-4 bg-white border-none shadow-sm relative overflow-hidden" hoverable>
                       <div className="flex justify-between items-start relative z-10 gap-2">
-                        <div className="flex space-x-2 sm:space-x-3 min-w-0">
-                          <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl bg-slate-100 flex items-center justify-center text-lg sm:text-xl shrink-0 overflow-hidden">
+                        <div className="flex space-x-2 sm:space-x-3 min-w-0 flex-1">
+                          <div className="h-10 w-10 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl bg-slate-100 flex items-center justify-center text-lg sm:text-xl shrink-0 overflow-hidden">
                             {group.imageUrl ? (
                               <img src={group.imageUrl} alt={group.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             ) : '🛒'}
                           </div>
-                          <div className="min-w-0">
-                            <h3 className="font-bold text-slate-900 text-sm sm:text-base truncate leading-tight">{group.name}</h3>
-                            <p className="text-[10px] sm:text-xs text-slate-500 truncate">{group.brand}</p>
-                            <div className="flex items-center mt-1.5 space-x-2 sm:space-x-3">
-                              <div className="flex items-center text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-bold text-slate-900 text-xs sm:text-base truncate leading-tight">{group.name}</h3>
+                            <p className="text-[9px] sm:text-xs text-slate-500 truncate mt-0.5">{group.brand}</p>
+                            <div className="flex items-center mt-1 sm:mt-1.5 space-x-2 sm:space-x-3">
+                              <div className="flex items-center text-[8px] sm:text-[10px] text-slate-400 font-bold uppercase">
                                 <MapPin size={10} className="mr-0.5 sm:mr-1" />
                                 {bestPrice.distance}
                               </div>
-                              <div className="flex items-center text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase">
+                              <div className="flex items-center text-[8px] sm:text-[10px] text-slate-400 font-bold uppercase">
                                 <Clock size={10} className="mr-0.5 sm:mr-1" />
                                 {bestPrice.time}
                               </div>
                             </div>
                           </div>
                         </div>
-                        <div className="text-right shrink-0 flex flex-col items-end">
-                          <p className="text-base sm:text-xl font-bold text-primary leading-none">{formatCurrency(bestPrice.price)}</p>
-                          <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase mt-1 truncate max-w-[80px] sm:max-w-none">{bestPrice.market}</p>
-                          <div className="flex flex-col items-end space-y-1 mt-2">
+                        <div className="text-right shrink-0 flex flex-col items-end ml-2">
+                          <p className="text-sm sm:text-xl font-bold text-primary leading-none">{formatCurrency(bestPrice.price)}</p>
+                          <p className="text-[8px] sm:text-[10px] font-bold text-slate-400 uppercase mt-1 truncate max-w-[60px] sm:max-w-none">
+                            {bestPrice.market}
+                          </p>
+                          <p className="text-[7px] text-slate-300 font-bold uppercase truncate">
+                            Por: {bestPrice.contributor}
+                          </p>
+                          <div className="flex flex-col items-end space-y-1 mt-1.5 sm:mt-2">
                             {bestPrice.flashSale && (
-                              <div className="flex items-center bg-red-500 text-white text-[8px] sm:text-[9px] font-bold px-1.5 sm:px-2 py-0.5 rounded-md animate-pulse">
+                              <div className="flex items-center bg-red-500 text-white text-[7px] sm:text-[9px] font-bold px-1 sm:px-2 py-0.5 rounded-md animate-pulse">
                                 <Zap size={8} className="mr-1 fill-current" />
                                 {bestPrice.flashSale.endsIn}
                               </div>
@@ -383,7 +392,7 @@ export const SearchPage = () => {
                             {bestPrice.hasProof && (
                               <button 
                                 onClick={() => setSelectedProof(bestPrice.proofUrl || null)}
-                                className="inline-flex items-center text-[8px] sm:text-[9px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded-md font-bold uppercase hover:bg-green-200 transition-colors whitespace-nowrap"
+                                className="inline-flex items-center text-[7px] sm:text-[9px] bg-green-100 text-green-600 px-1 sm:px-2 py-0.5 rounded-md font-bold uppercase hover:bg-green-200 transition-colors whitespace-nowrap"
                               >
                                 <Camera size={10} className="mr-1" />
                                 <span className="hidden xs:inline">Verificado • </span>Foto
@@ -474,27 +483,29 @@ export const SearchPage = () => {
       {/* Proof Modal */}
       <AnimatePresence>
         {selectedProof && (
-          <motion.div
+          <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/80 backdrop-blur-sm md:p-4"
             onClick={() => setSelectedProof(null)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative max-w-sm w-full bg-white rounded-3xl overflow-hidden shadow-2xl"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="relative w-full md:max-w-sm bg-white rounded-t-[32px] md:rounded-[32px] overflow-hidden shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
+              <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 md:hidden shrink-0" />
               <button 
                 onClick={() => setSelectedProof(null)}
-                className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full backdrop-blur-md transition-all z-10"
+                className="absolute top-6 right-6 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full backdrop-blur-md transition-all z-10"
               >
                 <X size={20} />
               </button>
-              <div className="p-4 border-b border-slate-100">
+              <div className="p-6 border-b border-slate-100">
                 <h3 className="font-bold text-slate-900 flex items-center">
                   <Camera size={18} className="mr-2 text-primary" />
                   Comprovante do Usuário
@@ -509,7 +520,7 @@ export const SearchPage = () => {
                   referrerPolicy="no-referrer"
                 />
               </div>
-              <div className="p-4 bg-slate-50">
+              <div className="p-6 bg-slate-50 pb-20 sm:pb-6">
                 <Button className="w-full" onClick={() => setSelectedProof(null)}>
                   Fechar
                 </Button>

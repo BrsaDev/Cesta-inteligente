@@ -1,21 +1,68 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, Calculator, Search, X } from 'lucide-react';
+import { Plus, Trash2, Calculator, Search, X, Save } from 'lucide-react';
 import { Card } from '@/src/components/ui/Card';
 import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/src/lib/supabase';
 import Fuse from 'fuse.js';
 import { normalizeString } from '@/src/lib/searchUtils';
 
 export const CreateList = () => {
   const navigate = useNavigate();
+  const { id: editId } = useParams();
   const [listName, setListName] = useState('Compra do mês');
   const [items, setItems] = useState<{ id: string; productId?: string; name: string; quantity: number }[]>([]);
   const [search, setSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (editId) {
+      fetchListForEdit();
+    }
+  }, [editId]);
+
+  const fetchListForEdit = async () => {
+    setIsLoading(true);
+    try {
+      const { data: listData, error: listError } = await supabase
+        .from('shopping_lists')
+        .select('name')
+        .eq('id', editId)
+        .single();
+      
+      if (listError) throw listError;
+      if (listData) setListName(listData.name);
+
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('shopping_list_items')
+        .select(`
+          id,
+          quantity,
+          product_id,
+          products (name)
+        `)
+        .eq('list_id', editId);
+      
+      if (itemsError) throw itemsError;
+
+      if (itemsData) {
+        setItems(itemsData.map((item: any) => ({
+          id: item.id,
+          productId: item.product_id,
+          name: item.products?.name || 'Produto',
+          quantity: item.quantity
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching list for edit:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -85,14 +132,24 @@ export const CreateList = () => {
     
     setIsSaving(true);
     try {
-      // 1. Create the list
-      const { data: listData, error: listError } = await supabase
-        .from('shopping_lists')
-        .insert([{ name: listName }]) // Removed invalid user_id
-        .select()
-        .single();
+      let listId = editId;
 
-      if (listError) throw listError;
+      // 1. Create or Update the list
+      if (editId) {
+        const { error: updateError } = await supabase
+          .from('shopping_lists')
+          .update({ name: listName })
+          .eq('id', editId);
+        if (updateError) throw updateError;
+      } else {
+        const { data: listData, error: listError } = await supabase
+          .from('shopping_lists')
+          .insert([{ name: listName }])
+          .select()
+          .single();
+        if (listError) throw listError;
+        listId = listData.id;
+      }
 
       // 2. Prepare items, ensuring all products exist in the DB
       const finalItems = [];
@@ -100,20 +157,20 @@ export const CreateList = () => {
       for (const item of items) {
         let pId = item.productId;
         
-        // If product doesn't have an ID, it's a custom item, try to find or create it
         if (!pId) {
+          const trimmedName = item.name.trim();
           const { data: existingProd } = await supabase
             .from('products')
             .select('id')
-            .ilike('name', item.name)
-            .single();
+            .ilike('name', trimmedName)
+            .maybeSingle(); // Use maybeSingle to avoid errors if multiple found
             
           if (existingProd) {
             pId = existingProd.id;
           } else {
             const { data: newProd, error: prodError } = await supabase
               .from('products')
-              .insert([{ name: item.name, category: 'Geral' }])
+              .insert([{ name: trimmedName, category: 'Geral' }])
               .select()
               .single();
             
@@ -125,11 +182,16 @@ export const CreateList = () => {
 
         if (pId) {
           finalItems.push({
-            list_id: listData.id,
+            list_id: listId,
             product_id: pId,
             quantity: item.quantity
           });
         }
+      }
+
+      // 3. Update items (delete old ones if editing)
+      if (editId) {
+        await supabase.from('shopping_list_items').delete().eq('list_id', editId);
       }
 
       if (finalItems.length > 0) {
@@ -140,7 +202,7 @@ export const CreateList = () => {
         if (itemsError) throw itemsError;
       }
 
-      navigate(`/results?listId=${listData.id}`);
+      navigate(`/results?listId=${listId}`);
     } catch (error) {
       console.error('Error saving list:', error);
       navigate('/results');
@@ -149,13 +211,21 @@ export const CreateList = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="pb-24 pt-6 px-4 space-y-6 max-w-lg mx-auto">
       <header className="flex items-center space-x-4">
         <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-slate-400 hover:text-slate-900 transition-colors">
           <X size={24} />
         </button>
-        <h1 className="text-xl font-bold text-slate-900">Nova lista</h1>
+        <h1 className="text-xl font-bold text-slate-900">{editId ? 'Editar lista' : 'Nova lista'}</h1>
       </header>
 
       <section className="space-y-4">
@@ -251,14 +321,14 @@ export const CreateList = () => {
       </section>
 
       {items.length > 0 && (
-        <div className="fixed bottom-20 left-4 right-4 max-w-lg mx-auto">
+        <div className="fixed bottom-20 left-4 right-4 max-w-lg mx-auto flex space-x-3">
           <Button 
-            className="w-full h-14 shadow-lg shadow-primary/20"
+            className="flex-1 h-14 shadow-lg shadow-primary/20"
             onClick={handleCalculate}
             isLoading={isSaving}
           >
-            <Calculator size={20} className="mr-2" />
-            Calcular melhor compra
+            {editId ? <Save size={20} className="mr-2" /> : <Calculator size={20} className="mr-2" />}
+            {editId ? 'Salvar e Calcular' : 'Calcular melhor compra'}
           </Button>
         </div>
       )}

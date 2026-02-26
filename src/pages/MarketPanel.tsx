@@ -127,17 +127,32 @@ export const MarketPanel = () => {
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [products, setProducts] = useState<MarketProduct[]>([]);
   const [marketId, setMarketId] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetchMarketAndProducts();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate('/profile');
+        return;
+      }
+      setUser(session.user);
+      fetchMarketAndProducts(session.user.id);
+    });
   }, []);
 
-  const fetchMarketAndProducts = async () => {
+  const fetchMarketAndProducts = async (userId: string) => {
     setIsLoading(true);
     try {
-      // For demo, we'll pick the first market
-      const { data: markets } = await supabase.from('markets').select('id').limit(1);
+      // Find market owned by this user
+      const { data: markets, error: mError } = await supabase
+        .from('markets')
+        .select('id')
+        .eq('owner_id', userId)
+        .limit(1);
+      
+      if (mError) throw mError;
+
       if (markets && markets.length > 0) {
         const mId = markets[0].id;
         setMarketId(mId);
@@ -165,6 +180,9 @@ export const MarketPanel = () => {
             imageUrl: item.products.image_url
           })));
         }
+      } else {
+        // If no market found, maybe create one or show message
+        console.warn('No market found for this user');
       }
     } catch (error) {
       console.error('Error fetching market products:', error);
@@ -276,19 +294,25 @@ export const MarketPanel = () => {
         if (prodError) throw prodError;
 
         if (newProd) {
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + 30); // Market prices last longer
+
           const { error: priceError } = await supabase
             .from('prices')
             .insert({
               product_id: newProd.id,
               market_id: marketId,
               price: formData.price,
-              source_type: 'market'
+              source_type: 'market',
+              is_active: true,
+              created_by: user.id,
+              expires_at: expiresAt.toISOString()
             });
           if (priceError) throw priceError;
         }
         showNotification('success', 'Produto adicionado com sucesso!');
       }
-      fetchMarketAndProducts();
+      fetchMarketAndProducts(user.id);
     } catch (error) {
       console.error('Save error:', error);
       showNotification('error', 'Erro ao salvar produto.');
@@ -591,14 +615,18 @@ export const MarketPanel = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm md:p-4"
+            onClick={() => setFlashSaleModalId(null)}
           >
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white w-full max-w-xs rounded-3xl overflow-hidden shadow-2xl p-6 space-y-6"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="bg-white w-full md:max-w-xs rounded-t-[32px] md:rounded-[32px] overflow-hidden shadow-2xl p-6 pb-20 md:pb-6 space-y-6"
+              onClick={(e) => e.stopPropagation()}
             >
+              <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-2 md:hidden" />
               <div className="text-center space-y-2">
                 <div className="h-12 w-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mx-auto">
                   <Zap size={24} fill="currentColor" />
@@ -643,15 +671,19 @@ export const MarketPanel = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm md:p-4"
+            onClick={() => setIsAdding(false)}
           >
             <motion.div 
-              initial={{ y: 100 }}
+              initial={{ y: "100%" }}
               animate={{ y: 0 }}
-              exit={{ y: 100 }}
-              className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl"
+              exit={{ y: "100%" }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="bg-white w-full md:max-w-md rounded-t-[32px] md:rounded-[32px] overflow-hidden shadow-2xl max-h-[90vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-6 space-y-6">
+              <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 md:hidden shrink-0" />
+              <div className="p-6 space-y-6 overflow-y-auto pb-24 sm:pb-6">
                 <div className="flex justify-between items-center">
                   <h3 className="text-xl font-bold text-slate-900">
                     {editingId ? 'Editar Produto' : 'Novo Produto'}
@@ -741,14 +773,18 @@ export const MarketPanel = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+            className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/80 backdrop-blur-md md:p-4"
+            onClick={() => setIsImageGalleryOpen(false)}
           >
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh]"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="bg-white w-full md:max-w-lg rounded-t-[32px] md:rounded-[32px] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
             >
+              <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 md:hidden shrink-0" />
               <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                 <h3 className="text-xl font-bold text-slate-900">Galeria de Imagens</h3>
                 <button onClick={() => setIsImageGalleryOpen(false)} className="p-2 text-slate-400 hover:text-slate-900">
@@ -793,7 +829,7 @@ export const MarketPanel = () => {
                 })}
               </div>
               
-              <div className="p-6 bg-slate-50 border-t border-slate-100">
+              <div className="p-6 bg-slate-50 border-t border-slate-100 pb-20 sm:pb-6">
                 <Input 
                   placeholder="URL da imagem personalizada..." 
                   value={formData.imageUrl}
@@ -821,7 +857,7 @@ export const MarketPanel = () => {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
-            className={`fixed bottom-24 left-4 right-4 max-w-sm mx-auto p-4 rounded-2xl shadow-xl flex items-center space-x-3 z-50 ${
+            className={`fixed bottom-24 left-4 right-4 max-w-sm mx-auto p-4 rounded-2xl shadow-xl flex items-center space-x-3 z-[110] ${
               notification.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
             }`}
           >
