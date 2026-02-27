@@ -92,24 +92,26 @@ export const Results = () => {
       // Map list items to actual product IDs using normalized matching
       const mappedItems = items.map(item => {
         const normalizedItemName = normalizeString(item.name);
-        // Find product that matches normalized name
-        const match = allProducts?.find(p => normalizeString(p.name) === normalizedItemName);
+        // Find ALL products that match normalized name
+        const matches = allProducts?.filter(p => normalizeString(p.name) === normalizedItemName) || [];
+        const matchIds = matches.map(m => m.id);
+        
         return {
           ...item,
-          productId: match?.id,
-          matchedName: match?.name
+          productIds: matchIds,
+          matchedNames: matches.map(m => m.name)
         };
       });
 
-      const productIds = mappedItems.map(i => i.productId).filter(Boolean) as string[];
+      const allMatchIds = Array.from(new Set(mappedItems.flatMap(i => i.productIds)));
       
-      if (productIds.length === 0) {
+      if (allMatchIds.length === 0) {
         console.warn('No products found in DB for these items:', items);
         return;
       }
 
       // 2. Fetch all active prices for these products
-      console.log('Step 2: Fetching prices for matched product IDs:', productIds);
+      console.log('Step 2: Fetching prices for matched product IDs:', allMatchIds);
       
       const { data: pricesData, error: pricesError } = await supabase
         .from('prices')
@@ -124,7 +126,7 @@ export const Results = () => {
             name
           )
         `)
-        .in('product_id', productIds);
+        .in('product_id', allMatchIds);
       
       if (pricesError) {
         console.error('Error fetching prices:', pricesError);
@@ -154,9 +156,9 @@ export const Results = () => {
         const foundItemNames: string[] = [];
 
         mappedItems.forEach(item => {
-          if (!item.productId) return;
+          if (item.productIds.length === 0) return;
 
-          const itemPrices = activePrices.filter(p => p.product_id === item.productId);
+          const itemPrices = activePrices.filter(p => item.productIds.includes(p.product_id));
           
           if (itemPrices.length === 0) {
             console.log(`No active prices found for item: ${item.name}`);
@@ -213,9 +215,9 @@ export const Results = () => {
             const mItems: any[] = [];
 
             mappedItems.forEach(item => {
-              if (!item.productId) return;
+              if (item.productIds.length === 0) return;
 
-              const priceObj = activePrices.find(p => p.product_id === item.productId && p.market_id === m.id);
+              const priceObj = activePrices.find(p => item.productIds.includes(p.product_id) && p.market_id === m.id);
               
               if (priceObj) {
                 const itemTotal = Number(priceObj.price) * item.quantity;
@@ -335,18 +337,18 @@ export const Results = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Trophy className="text-yellow-500" size={20} />
-              <h2 className="text-lg font-bold text-slate-900">Economia máxima</h2>
+              <h2 className="text-lg font-bold text-slate-900">Economia Máxima</h2>
             </div>
-            <div className="flex items-center text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded-full font-bold uppercase tracking-wider">
-              <Info size={12} className="mr-1" />
-              Multi-mercado
+            <div className="flex items-center text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-bold uppercase tracking-wider">
+              <Zap size={12} className="mr-1" />
+              Vários Mercados
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-2">
-            <p className="text-xs text-blue-700 leading-relaxed">
-              <strong>Como funciona:</strong> Compramos cada item onde ele está mais barato. 
-              Você economiza mais, mas precisa visitar mais de um mercado.
+          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-2">
+            <p className="text-xs text-emerald-800 leading-relaxed">
+              <strong>O melhor preço:</strong> Compramos cada item onde ele está mais barato. 
+              Você economiza o máximo possível, mas precisa visitar mais de um local.
             </p>
           </div>
           
@@ -451,29 +453,30 @@ export const Results = () => {
             <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Zap className="text-secondary" size={20} />
-                  <h2 className="text-lg font-bold text-slate-900">Mais prático</h2>
+                  <Store className="text-secondary" size={20} />
+                  <h2 className="text-lg font-bold text-slate-900">Compre tudo em um só lugar</h2>
                 </div>
-                <div className="flex items-center text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded-full font-bold uppercase tracking-wider">
-                  <Info size={12} className="mr-1" />
-                  Mercado único
+                <div className="flex items-center text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-bold uppercase tracking-wider">
+                  <CheckCircle2 size={12} className="mr-1" />
+                  Mercado Único
                 </div>
               </div>
 
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 mb-2">
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  <strong>Como funciona:</strong> Mostramos os melhores mercados para você fazer a compra completa 
-                  em um só lugar. Mais rápido e conveniente.
+              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-2">
+                <p className="text-xs text-blue-800 leading-relaxed">
+                  <strong>Mais prático:</strong> Mostramos os melhores mercados para você fazer a compra completa 
+                  sem precisar se deslocar. Ideal para quem tem pouco tempo.
                 </p>
               </div>
 
               <div className="space-y-3">
                 {singleMarketRanking.map((market, idx) => {
-                  const statusColor = market.score === 100 ? 'emerald-500' : 'amber-500';
-                  const statusText = market.score === 100 ? 'text-emerald-600' : 'text-amber-600';
-                  const statusRing = market.score === 100 ? 'ring-emerald-500' : 'ring-amber-500';
-                  const statusBg = market.score === 100 ? 'bg-emerald-50' : 'bg-amber-50';
-                  const statusIconText = market.score === 100 ? 'text-emerald-500' : 'text-amber-500';
+                  const isComplete = market.score === 100;
+                  const statusColor = isComplete ? 'emerald-500' : 'amber-500';
+                  const statusText = isComplete ? 'text-emerald-600' : 'text-amber-600';
+                  const statusRing = isComplete ? 'ring-emerald-500' : 'ring-amber-500';
+                  const statusBg = isComplete ? 'bg-emerald-50' : 'bg-amber-50';
+                  const statusIconText = isComplete ? 'text-emerald-500' : 'text-amber-500';
 
                   return (
                     <Card 
@@ -494,16 +497,25 @@ export const Results = () => {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center space-x-1 sm:space-x-2">
                             <h3 className="font-bold text-slate-900 text-sm sm:text-base truncate">{market.name}</h3>
-                            {idx === 0 && <CheckCircle2 size={12} className={`${statusIconText} shrink-0`} />}
+                            {isComplete && <CheckCircle2 size={12} className={`${statusIconText} shrink-0`} />}
                           </div>
-                          <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">
-                            {idx === 0 ? 'Melhor preço único' : `${idx + 1}ª melhor opção`}
-                          </p>
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">
+                              {isComplete ? '✔ Tem todos os itens da sua lista' : '⚠ Lista incompleta'}
+                            </p>
+                            {!isComplete && (
+                              <span className="text-[9px] bg-amber-100 text-amber-700 px-1 rounded font-bold uppercase">
+                                Economiza mais nos itens que tem
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-base sm:text-lg font-bold text-slate-900 leading-none">{formatCurrency(market.total)}</p>
-                        <p className="text-[9px] sm:text-[10px] text-green-600 font-bold mt-1">Economia: {formatCurrency(market.savings)}</p>
+                        <p className="text-[9px] sm:text-[10px] text-green-600 font-bold mt-1">
+                          {isComplete ? `Economia: ${formatCurrency(market.savings)}` : `Poupa ${formatCurrency(market.savings)} nestes itens`}
+                        </p>
                       </div>
                     </div>
                     
@@ -515,7 +527,7 @@ export const Results = () => {
                           </span>
                         </div>
                         <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div className={`bg-${statusColor} h-full`} style={{ width: `${market.score}%` }} />
+                          <div className={`bg-${statusColor} h-full transition-all duration-500`} style={{ width: `${market.score}%` }} />
                         </div>
                       </div>
 

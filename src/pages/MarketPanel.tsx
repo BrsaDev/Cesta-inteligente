@@ -277,14 +277,28 @@ export const MarketPanel = () => {
         
         if (prodError) throw prodError;
 
-        // Update price
-        const product = products.find(p => p.id === editingId);
-        if (product?.price_id) {
+        // Update price - Use price_id from formData or find it
+        const priceId = formData.price_id || products.find(p => p.id === editingId)?.price_id;
+        
+        if (priceId) {
           const { error: priceError } = await supabase
             .from('prices')
             .update({ price: formData.price })
-            .eq('id', product.price_id);
+            .eq('id', priceId);
           if (priceError) throw priceError;
+        } else {
+          // Fallback: If price_id is missing, try to upsert by product and market
+          const { error: upsertError } = await supabase
+            .from('prices')
+            .upsert({
+              product_id: editingId,
+              market_id: marketId,
+              price: formData.price,
+              source_type: 'market',
+              is_active: true,
+              created_by: user.id
+            }, { onConflict: 'product_id,market_id' });
+          if (upsertError) throw upsertError;
         }
 
         showNotification('success', 'Produto atualizado com sucesso!');
