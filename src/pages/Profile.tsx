@@ -175,14 +175,38 @@ export const Profile = () => {
         </div>
         
         {!isMarket && (
-          <div className="flex space-x-2">
-            <div className="bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-100">
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Reputação</p>
-              <p className="text-lg font-bold text-primary">{profile?.reputation_score || 0} pts</p>
+          <div className="flex flex-col space-y-2 w-full">
+            <div className="flex space-x-2 justify-center">
+              <div className="bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-100">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Reputação</p>
+                <p className="text-lg font-bold text-primary">{profile?.reputation_score || 0} pts</p>
+              </div>
+              <div className="bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-100">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Nível</p>
+                <p className="text-lg font-bold text-secondary">Bronze</p>
+              </div>
             </div>
-            <div className="bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-100">
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Nível</p>
-              <p className="text-lg font-bold text-secondary">Bronze</p>
+            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 mt-4">
+              <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-2">Acesso para Lojistas</p>
+              <p className="text-xs text-slate-600 mb-3">Se você é dono de um mercado e sua conta não foi identificada corretamente:</p>
+              <Button 
+                variant="outline"
+                size="sm"
+                className="w-full border-blue-200 text-blue-600 hover:bg-blue-100 font-bold"
+                onClick={async () => {
+                  if (!profile?.id) return;
+                  const { error } = await supabase
+                    .from('profiles')
+                    .update({ role: 'market' })
+                    .eq('id', profile.id);
+                  if (!error) {
+                    alert('Perfil atualizado para Mercado com sucesso!');
+                    fetchProfile(profile.id);
+                  }
+                }}
+              >
+                Ativar Perfil de Mercado
+              </Button>
             </div>
           </div>
         )}

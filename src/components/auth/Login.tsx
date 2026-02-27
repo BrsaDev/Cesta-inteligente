@@ -33,7 +33,11 @@ export const Login = ({ onSuccess }: LoginProps) => {
           email,
           password,
           options: {
-            data: { name, role },
+            data: { 
+              name: name, 
+              role: role,
+              display_name: name 
+            },
             emailRedirectTo: window.location.origin,
           },
         });
@@ -81,20 +85,29 @@ export const Login = ({ onSuccess }: LoginProps) => {
 
         if (data.user) {
           // Ensure profile exists (in case it wasn't created during signup due to RLS/Confirmation)
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('id')
+            .select('*')
             .eq('id', data.user.id)
             .single();
 
+          const metadataRole = data.user.user_metadata.role || 'user';
+
           if (!profile) {
-            await supabase.from('profiles').insert({
+            console.log('Creating missing profile on login with role:', metadataRole);
+            const { error: insertError } = await supabase.from('profiles').insert({
               id: data.user.id,
               name: data.user.user_metadata.name || 'Usuário',
               email: data.user.email!,
-              role: data.user.user_metadata.role || 'user',
+              role: metadataRole,
               reputation_score: 0,
             });
+            if (insertError) console.error('Error creating profile:', insertError);
+          } else if (profile.role !== metadataRole && metadataRole === 'market') {
+            // Fix role if metadata says market but profile says user
+            console.log('Fixing profile role to market based on metadata');
+            const { error: updateError } = await supabase.from('profiles').update({ role: 'market' }).eq('id', data.user.id);
+            if (updateError) console.error('Error updating profile role:', updateError);
           }
         }
         
@@ -160,7 +173,7 @@ export const Login = ({ onSuccess }: LoginProps) => {
                     <button
                       type="button"
                       onClick={() => setRole('user')}
-                      className={`flex items-center justify-center space-x-2 p-3 rounded-2xl border-2 transition-all ${
+                      className={`flex items-center justify-center space-x-2 p-3 rounded-2xl border-2 transition-all relative ${
                         role === 'user' 
                           ? 'border-primary bg-primary/5 text-primary' 
                           : 'border-slate-100 text-slate-400 hover:border-slate-200'
@@ -168,11 +181,16 @@ export const Login = ({ onSuccess }: LoginProps) => {
                     >
                       <User size={18} />
                       <span className="font-bold text-sm">Usuário</span>
+                      {role === 'user' && (
+                        <div className="absolute -top-2 -right-2 bg-primary text-white rounded-full p-0.5 shadow-sm">
+                          <CheckCircle2 size={12} />
+                        </div>
+                      )}
                     </button>
                     <button
                       type="button"
                       onClick={() => setRole('market')}
-                      className={`flex items-center justify-center space-x-2 p-3 rounded-2xl border-2 transition-all ${
+                      className={`flex items-center justify-center space-x-2 p-3 rounded-2xl border-2 transition-all relative ${
                         role === 'market' 
                           ? 'border-primary bg-primary/5 text-primary' 
                           : 'border-slate-100 text-slate-400 hover:border-slate-200'
@@ -180,6 +198,11 @@ export const Login = ({ onSuccess }: LoginProps) => {
                     >
                       <Store size={18} />
                       <span className="font-bold text-sm">Mercado</span>
+                      {role === 'market' && (
+                        <div className="absolute -top-2 -right-2 bg-primary text-white rounded-full p-0.5 shadow-sm">
+                          <CheckCircle2 size={12} />
+                        </div>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -218,7 +241,7 @@ export const Login = ({ onSuccess }: LoginProps) => {
               className="w-full h-12 text-lg shadow-lg shadow-primary/20" 
               isLoading={loading}
             >
-              {isSignUp ? 'Criar conta' : 'Entrar'}
+              {isSignUp ? (role === 'market' ? 'Criar conta de Mercado' : 'Criar conta de Usuário') : 'Entrar'}
               <ArrowRight size={20} className="ml-2" />
             </Button>
 

@@ -241,6 +241,16 @@ export const MarketPanel = () => {
     category: '',
     imageUrl: ''
   });
+  const [localPrice, setLocalPrice] = useState('');
+
+  // Sync localPrice ONLY when editingId changes (loading a product)
+  useEffect(() => {
+    if (editingId && formData.price !== undefined) {
+      setLocalPrice(formData.price.toString().replace('.', ','));
+    } else if (!isAdding) {
+      setLocalPrice('');
+    }
+  }, [editingId, isAdding]);
 
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
@@ -347,51 +357,37 @@ export const MarketPanel = () => {
     return isNaN(parsed) ? 0 : parsed;
   };
 
+  const [isImporting, setIsImporting] = useState(false);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !marketId) return;
 
+    setIsImporting(true);
     try {
-      let importedProducts: MarketProduct[] = [];
+      let importedData: any[] = [];
 
       if (file.name.endsWith('.csv')) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const result = event.target?.result;
-          if (typeof result !== 'string') return;
-
-          // XLSX can handle CSV strings. We specify codepage 65001 for UTF-8
-          const workbook = XLSX.read(result, { type: 'string', codepage: 65001 });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-          
-          const imported: MarketProduct[] = [];
-          jsonData.slice(1).forEach((row: any) => {
-            const name = row[0]?.toString().trim();
-            const brand = row[1]?.toString().trim();
-            const priceStr = row[2]?.toString().trim();
-            const category = row[3]?.toString().trim();
-
-            if (name && priceStr) {
-              imported.push({
-                id: Math.random().toString(36).substr(2, 9),
-                name,
-                brand: brand || '',
-                price: parsePrice(priceStr),
-                category: category || 'Geral',
-                imageUrl: getSuggestedImage(name)
-              });
-            }
-          });
-          
-          if (imported.length > 0) {
-            setProducts(prev => [...imported, ...prev]);
-            showNotification('success', `${imported.length} produtos importados!`);
-          }
-        };
+        const text = await file.text();
+        const workbook = XLSX.read(text, { type: 'string', codepage: 65001 });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         
-        // Read as string to handle encoding better
-        reader.readAsText(file, 'UTF-8');
+        jsonData.slice(1).forEach((row: any) => {
+          const name = row[0]?.toString().trim();
+          const brand = row[1]?.toString().trim();
+          const priceStr = row[2]?.toString().trim();
+          const category = row[3]?.toString().trim();
+
+          if (name && priceStr) {
+            importedData.push({
+              name,
+              brand: brand || '',
+              price: parsePrice(priceStr),
+              category: category || 'Geral'
+            });
+          }
+        });
       } else {
         const arrayBuffer = await file.arrayBuffer();
         const workbook = new ExcelJS.Workbook();
@@ -406,27 +402,111 @@ export const MarketPanel = () => {
             const category = row.getCell(4).value?.toString();
 
             if (name && (priceVal !== null && priceVal !== undefined)) {
-              importedProducts.push({
-                id: Math.random().toString(36).substr(2, 9),
+              importedData.push({
                 name: name.trim(),
                 brand: brand?.trim() || '',
                 price: parsePrice(priceVal),
-                category: category?.trim() || 'Geral',
-                imageUrl: getSuggestedImage(name.trim())
+                category: category?.trim() || 'Geral'
               });
             }
           });
         }
-        
-        if (importedProducts.length > 0) {
-          setProducts(prev => [...importedProducts, ...prev]);
-          showNotification('success', `${importedProducts.length} produtos importados!`);
+      }
+
+      if (importedData.length === 0) {
+        showNotification('error', 'Nenhum produto válido encontrado no arquivo.');
+        return;
+      }
+
+      // Process and save to database
+      let successCount = 0;
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      for (const item of importedData) {
+        try {
+          // 1. Check if product exists
+          let productId;
+          const { data: existingProd } = await supabase
+            .from('products')
+            .select('id')
+            .ilike('name', item.name)
+            .ilike('brand', item.brand)
+            .maybeSingle();
+
+          if (existingProd) {
+            productId = existingProd.id;
+          } else {
+            // 2. Create product
+            const { data: newProd, error: prodError } = await supabase
+              .from('products')
+              .insert({
+                name: item.name,
+                brand: item.brand,
+                category: item.category,
+                image_url: getSuggestedImage(item.name)
+              })
+              .select()
+              .single();
+            
+            if (prodError) throw prodError;
+            productId = newProd.id;
+          }
+
+          // 3. Upsert price for this market
+          const { error: priceError } = await supabase
+            .from('prices')
+            .upsert({
+              product_id: productId,
+              market_id: marketId,
+              price: item.price,
+              source_type: 'market',
+              is_active: true,
+              created_by: user.id,
+              expires_at: expiresAt.toISOString()
+            }, { onConflict: 'product_id,market_id' }); // Assuming we have a unique constraint or just use upsert logic
+
+          if (priceError) {
+            // If upsert fails due to missing constraint, try manual check
+            const { data: existingPrice } = await supabase
+              .from('prices')
+              .select('id')
+              .eq('product_id', productId)
+              .eq('market_id', marketId)
+              .maybeSingle();
+
+            if (existingPrice) {
+              await supabase
+                .from('prices')
+                .update({ price: item.price, expires_at: expiresAt.toISOString() })
+                .eq('id', existingPrice.id);
+            } else {
+              await supabase
+                .from('prices')
+                .insert({
+                  product_id: productId,
+                  market_id: marketId,
+                  price: item.price,
+                  source_type: 'market',
+                  is_active: true,
+                  created_by: user.id,
+                  expires_at: expiresAt.toISOString()
+                });
+            }
+          }
+          successCount++;
+        } catch (err) {
+          console.error(`Error importing ${item.name}:`, err);
         }
       }
+
+      showNotification('success', `${successCount} produtos salvos com sucesso!`);
+      fetchMarketAndProducts(user.id);
     } catch (error) {
       console.error('Erro ao processar arquivo:', error);
       showNotification('error', 'Erro ao processar o arquivo. Verifique o formato.');
     } finally {
+      setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -495,6 +575,7 @@ export const MarketPanel = () => {
             size="sm" 
             onClick={() => fileInputRef.current?.click()}
             className="border-slate-200 text-slate-600 px-2 sm:px-4"
+            isLoading={isImporting}
           >
             <Upload size={16} className="sm:mr-2" />
             <span className="hidden sm:inline">Importar</span>
@@ -733,12 +814,14 @@ export const MarketPanel = () => {
                     <Input 
                       label="Preço (R$)" 
                       placeholder="0,00" 
-                      value={formData.price !== undefined ? formData.price.toString().replace('.', ',') : ''}
+                      value={localPrice}
                       onChange={(e) => {
                         const val = e.target.value;
-                        // Allow typing commas and dots
+                        // Allow typing numbers, commas and dots
                         if (val === '' || /^[0-9R$\s,.]*$/.test(val)) {
-                          setFormData({ ...formData, price: parsePrice(val) });
+                          setLocalPrice(val);
+                          const parsed = parsePrice(val);
+                          setFormData(prev => ({ ...prev, price: parsed }));
                         }
                       }}
                     />

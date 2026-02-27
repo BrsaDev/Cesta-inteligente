@@ -69,6 +69,10 @@ export const SearchPage = () => {
 
       setIsLoading(true);
       try {
+        const searchTerms = search.trim().split(/\s+/)
+          .map(t => normalizeString(t))
+          .filter(t => t.length > 0);
+
         let query = supabase
           .from('prices')
           .select(`
@@ -82,8 +86,12 @@ export const SearchPage = () => {
             markets (id, name),
             profiles:created_by (name)
           `)
-          .ilike('products.name', `%${search}%`)
           .eq('is_active', true);
+
+        // Apply each search term as a filter
+        searchTerms.forEach(term => {
+          query = query.ilike('products.name', `%${term}%`);
+        });
 
         if (selectedMarkets.length > 0) {
           query = query.in('market_id', selectedMarkets);

@@ -127,7 +127,7 @@ export const CreateList = () => {
     ));
   };
 
-  const handleCalculate = async () => {
+  const handleSave = async () => {
     if (items.length === 0) return;
     
     setIsSaving(true);
@@ -135,6 +135,9 @@ export const CreateList = () => {
       let listId = editId;
 
       // 1. Create or Update the list
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
       if (editId) {
         const { error: updateError } = await supabase
           .from('shopping_lists')
@@ -144,7 +147,7 @@ export const CreateList = () => {
       } else {
         const { data: listData, error: listError } = await supabase
           .from('shopping_lists')
-          .insert([{ name: listName }])
+          .insert([{ name: listName, user_id: user.id }])
           .select()
           .single();
         if (listError) throw listError;
@@ -159,23 +162,39 @@ export const CreateList = () => {
         
         if (!pId) {
           const trimmedName = item.name.trim();
-          const { data: existingProd } = await supabase
+          const normalizedInput = normalizeString(trimmedName);
+          
+          // 1. Try exact/ilike match first
+          const { data: exactMatch } = await supabase
             .from('products')
-            .select('id')
+            .select('id, name')
             .ilike('name', trimmedName)
-            .maybeSingle(); // Use maybeSingle to avoid errors if multiple found
+            .maybeSingle();
             
-          if (existingProd) {
-            pId = existingProd.id;
+          if (exactMatch) {
+            pId = exactMatch.id;
           } else {
-            const { data: newProd, error: prodError } = await supabase
+            // 2. Try matching with normalized names
+            // Fetch products that might match (this is a bit heavy but safer for small catalogs)
+            const { data: allProducts } = await supabase
               .from('products')
-              .insert([{ name: trimmedName, category: 'Geral' }])
-              .select()
-              .single();
+              .select('id, name');
             
-            if (!prodError && newProd) {
-              pId = newProd.id;
+            const fuzzyMatch = allProducts?.find(p => normalizeString(p.name) === normalizedInput);
+            
+            if (fuzzyMatch) {
+              pId = fuzzyMatch.id;
+            } else {
+              // 3. Create new product if no match found
+              const { data: newProd, error: prodError } = await supabase
+                .from('products')
+                .insert([{ name: trimmedName, category: 'Geral' }])
+                .select()
+                .single();
+              
+              if (!prodError && newProd) {
+                pId = newProd.id;
+              }
             }
           }
         }
@@ -202,10 +221,10 @@ export const CreateList = () => {
         if (itemsError) throw itemsError;
       }
 
-      navigate(`/results?listId=${listId}`);
+      navigate('/mylists');
     } catch (error) {
       console.error('Error saving list:', error);
-      navigate('/results');
+      navigate('/mylists');
     } finally {
       setIsSaving(false);
     }
@@ -324,11 +343,11 @@ export const CreateList = () => {
         <div className="fixed bottom-20 left-4 right-4 max-w-lg mx-auto flex space-x-3">
           <Button 
             className="flex-1 h-14 shadow-lg shadow-primary/20"
-            onClick={handleCalculate}
+            onClick={handleSave}
             isLoading={isSaving}
           >
-            {editId ? <Save size={20} className="mr-2" /> : <Calculator size={20} className="mr-2" />}
-            {editId ? 'Salvar e Calcular' : 'Calcular melhor compra'}
+            <Save size={20} className="mr-2" />
+            {editId ? 'Salvar alterações' : 'Salvar lista'}
           </Button>
         </div>
       )}

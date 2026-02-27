@@ -6,6 +6,7 @@ import { formatCurrency } from '@/src/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/src/lib/supabase';
+import { normalizeString } from '@/src/lib/searchUtils';
 
 export const Results = () => {
   const navigate = useNavigate();
@@ -81,26 +82,34 @@ export const Results = () => {
 
       console.log('Step 1: Calculating results for items:', items);
 
-      // 1. Get all product names from the list to find all related product IDs
-      // This handles cases where there might be duplicate products with the same name
-      const productNames = items.map(i => i.name.trim());
-      
-      const { data: relatedProducts, error: prodError } = await supabase
+      // 1. Get all products to find matches using normalized names
+      const { data: allProducts, error: prodError } = await supabase
         .from('products')
-        .select('id, name')
-        .in('name', productNames);
+        .select('id, name');
 
       if (prodError) throw prodError;
 
-      const productIds = (relatedProducts || []).map(p => p.id);
+      // Map list items to actual product IDs using normalized matching
+      const mappedItems = items.map(item => {
+        const normalizedItemName = normalizeString(item.name);
+        // Find product that matches normalized name
+        const match = allProducts?.find(p => normalizeString(p.name) === normalizedItemName);
+        return {
+          ...item,
+          productId: match?.id,
+          matchedName: match?.name
+        };
+      });
+
+      const productIds = mappedItems.map(i => i.productId).filter(Boolean) as string[];
       
       if (productIds.length === 0) {
-        console.warn('No products found in DB for these names:', productNames);
+        console.warn('No products found in DB for these items:', items);
         return;
       }
 
       // 2. Fetch all active prices for these products
-      console.log('Step 2: Fetching prices for related product IDs:', productIds);
+      console.log('Step 2: Fetching prices for matched product IDs:', productIds);
       
       const { data: pricesData, error: pricesError } = await supabase
         .from('prices')
@@ -144,13 +153,10 @@ export const Results = () => {
         const marketGroups: Record<string, any> = {};
         const foundItemNames: string[] = [];
 
-        items.forEach(item => {
-          // Find all IDs associated with this item name
-          const itemProductIds = (relatedProducts || [])
-            .filter(p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase())
-            .map(p => p.id);
+        mappedItems.forEach(item => {
+          if (!item.productId) return;
 
-          const itemPrices = activePrices.filter(p => itemProductIds.includes(p.product_id));
+          const itemPrices = activePrices.filter(p => p.product_id === item.productId);
           
           if (itemPrices.length === 0) {
             console.log(`No active prices found for item: ${item.name}`);
@@ -206,12 +212,10 @@ export const Results = () => {
             let availableItems = 0;
             const mItems: any[] = [];
 
-            items.forEach(item => {
-              const itemProductIds = (relatedProducts || [])
-                .filter(p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase())
-                .map(p => p.id);
+            mappedItems.forEach(item => {
+              if (!item.productId) return;
 
-              const priceObj = activePrices.find(p => itemProductIds.includes(p.product_id) && p.market_id === m.id);
+              const priceObj = activePrices.find(p => p.product_id === item.productId && p.market_id === m.id);
               
               if (priceObj) {
                 const itemTotal = Number(priceObj.price) * item.quantity;
@@ -312,6 +316,22 @@ export const Results = () => {
           {/* Multi-Market Option */}
           {multiMarket && multiMarket.total > 0 && (
         <section className="space-y-4">
+          {/* Color Legend */}
+          <div className="flex flex-wrap gap-4 px-1 py-1">
+            <div className="flex items-center space-x-1.5">
+              <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Completo</span>
+            </div>
+            <div className="flex items-center space-x-1.5">
+              <div className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Parcial</span>
+            </div>
+            <div className="flex items-center space-x-1.5">
+              <div className="h-2.5 w-2.5 rounded-full bg-red-500" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vazio</span>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Trophy className="text-yellow-500" size={20} />
@@ -448,17 +468,24 @@ export const Results = () => {
               </div>
 
               <div className="space-y-3">
-                {singleMarketRanking.map((market, idx) => (
-                  <Card 
-                    key={`${market.id}-${idx}`} 
-                    className={`p-4 sm:p-5 transition-all cursor-pointer ${idx === 0 ? 'ring-2 ring-primary ring-offset-2' : ''}`} 
-                    hoverable
-                    onClick={() => setExpandedSingleMarket(expandedSingleMarket === market.id ? null : market.id)}
-                  >
+                {singleMarketRanking.map((market, idx) => {
+                  const statusColor = market.score === 100 ? 'emerald-500' : 'amber-500';
+                  const statusText = market.score === 100 ? 'text-emerald-600' : 'text-amber-600';
+                  const statusRing = market.score === 100 ? 'ring-emerald-500' : 'ring-amber-500';
+                  const statusBg = market.score === 100 ? 'bg-emerald-50' : 'bg-amber-50';
+                  const statusIconText = market.score === 100 ? 'text-emerald-500' : 'text-amber-500';
+
+                  return (
+                    <Card 
+                      key={`${market.id}-${idx}`} 
+                      className={`p-4 sm:p-5 transition-all cursor-pointer ${idx === 0 ? `ring-2 ${statusRing} ring-offset-2` : ''}`} 
+                      hoverable
+                      onClick={() => setExpandedSingleMarket(expandedSingleMarket === market.id ? null : market.id)}
+                    >
                     <div className="flex justify-between items-start gap-2">
                       <div className="flex space-x-2 sm:space-x-3 min-w-0 flex-1">
                         <div className={`h-9 w-9 sm:h-10 sm:w-10 rounded-xl flex items-center justify-center shrink-0 ${
-                          idx === 0 ? 'bg-primary/10 text-primary' : 
+                          idx === 0 ? `${statusBg} ${statusIconText}` : 
                           idx === 1 ? 'bg-slate-100 text-slate-500' : 
                           'bg-orange-50 text-orange-500'
                         }`}>
@@ -467,7 +494,7 @@ export const Results = () => {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center space-x-1 sm:space-x-2">
                             <h3 className="font-bold text-slate-900 text-sm sm:text-base truncate">{market.name}</h3>
-                            {idx === 0 && <CheckCircle2 size={12} className="text-primary shrink-0" />}
+                            {idx === 0 && <CheckCircle2 size={12} className={`${statusIconText} shrink-0`} />}
                           </div>
                           <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">
                             {idx === 0 ? 'Melhor preço único' : `${idx + 1}ª melhor opção`}
@@ -483,12 +510,12 @@ export const Results = () => {
                       <div className="mt-4">
                         <div className="flex justify-between mb-1.5">
                           <span className="text-[9px] text-slate-400 font-bold uppercase">Cobertura da lista</span>
-                          <span className={`text-[9px] font-bold ${market.score === 100 ? 'text-primary' : 'text-amber-500'}`}>
+                          <span className={`text-[9px] font-bold ${statusIconText}`}>
                             {market.score}% ({market.items.length}/{listItems.length} itens)
                           </span>
                         </div>
                         <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div className={`${market.score === 100 ? 'bg-primary' : 'bg-amber-500'} h-full`} style={{ width: `${market.score}%` }} />
+                          <div className={`bg-${statusColor} h-full`} style={{ width: `${market.score}%` }} />
                         </div>
                       </div>
 
@@ -514,13 +541,14 @@ export const Results = () => {
                     </AnimatePresence>
 
                     <div className="mt-4 flex justify-center">
-                      <button className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center">
+                      <button className={`text-[10px] font-bold ${statusText} uppercase tracking-widest flex items-center`}>
                         {expandedSingleMarket === market.id ? 'Ocultar detalhes' : 'Ver detalhes'}
                         {expandedSingleMarket === market.id ? <ChevronUp size={12} className="ml-1" /> : <ChevronDown size={12} className="ml-1" />}
                       </button>
                     </div>
                   </Card>
-                ))}
+                );
+              })}
               </div>
             </section>
           )}
